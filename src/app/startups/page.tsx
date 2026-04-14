@@ -8,6 +8,7 @@ import {
 import { Navigation } from "@/components/home/Navigation";
 import { Footer } from "@/components/home/Footer";
 import { parsePhoneNumber, isValidPhoneNumber, CountryCode } from "libphonenumber-js";
+import { useSession } from "next-auth/react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ const steps = [
 ];
 
 // Full country list with ISO codes and dial codes
-const COUNTRIES: { code: CountryCode; dial: string; name: string }[] = [
+const COUNTRIES: { code: string; dial: string; name: string }[] = [
   { code: "AF", dial: "+93",  name: "Afghanistan" },
   { code: "AL", dial: "+355", name: "Albania" },
   { code: "DZ", dial: "+213", name: "Algeria" },
@@ -212,6 +213,7 @@ function FieldSuccess({ message }: { message?: string }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ApplyPage() {
+  const { data: session, status } = useSession();
   const [currentStep, setCurrentStep]   = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess]   = useState(false);
@@ -585,7 +587,7 @@ export default function ApplyPage() {
   if (!isClient) {
     return (
       <div className="min-h-screen flex flex-col">
-        <Navigation activeItem="startups" />
+      <Navigation activeItem="home" isLoggedIn={!!session?.user} />
         <main className="flex-1 pt-16 sm:pt-20 flex items-center justify-center">
           <div className="animate-pulse text-forest/40 text-sm">Loading…</div>
         </main>
@@ -596,7 +598,7 @@ export default function ApplyPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen flex flex-col bg-beige/30">
-      <Navigation activeItem="startups" />
+      <Navigation activeItem="home" isLoggedIn={!!session?.user} />
 
       {/* ── Sticky mobile progress bar ── */}
       <div className="lg:hidden sticky top-16 z-40 bg-white border-b border-forest/10 shadow-sm">
