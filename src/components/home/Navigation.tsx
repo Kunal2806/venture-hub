@@ -1,17 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { Leaf, Home, Sprout, Landmark, Users, User } from "lucide-react";
+import { Leaf, Home, Sprout, Landmark, Users, User, LayoutDashboard } from "lucide-react";
 
 interface NavigationProps {
   activeItem?: "home" | "startups" | "investors" | "mentorship" | "mission" | "cohort" | "profile";
+  isLoggedIn?: boolean;
 }
 
 const topNavLinks = [
-  { key: "startups",   label: "Startups",    href: "/startups" },
-  { key: "investors",  label: "Investors",   href: "/investors" },
-  { key: "mentorship", label: "Mentorship",  href: "/mentorship" },
-  { key: "mission",    label: "Our Mission", href: "/#mission" },
+  { key: "startups",   label: "Startups",   href: "/startups" },
+  { key: "investors",  label: "Investors",  href: "/investors" },
+  { key: "mentorship", label: "Mentorship", href: "/mentorship" },
+  { key: "profile",    label: "Profile",    href: "/profile" },
 ];
 
 const bottomTabs = [
@@ -22,10 +23,10 @@ const bottomTabs = [
   { key: "profile",    label: "Profile",   href: "/profile",    Icon: User },
 ];
 
-export function Navigation({ activeItem = "home" }: NavigationProps) {
+export function Navigation({ activeItem = "home", isLoggedIn = false }: NavigationProps) {
   return (
     <>
-      {/* ── Top Navbar ── fixed h-16 mobile / h-20 sm+ */}
+      {/* ── Top Navbar ── */}
       <nav className="fixed top-0 left-0 w-full z-50 bg-cream/90 backdrop-blur-md border-b border-forest/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
 
@@ -54,28 +55,66 @@ export function Navigation({ activeItem = "home" }: NavigationProps) {
 
           {/* Desktop Actions */}
           <div className="hidden lg:flex items-center gap-6 flex-shrink-0">
+            {isLoggedIn ? (
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-2 px-6 xl:px-8 py-3 bg-forest text-white text-xs font-bold uppercase tracking-widest hover:bg-forest/90 transition-all shadow-lg shadow-forest/10"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/auth/login"
+                  className="text-sm font-bold uppercase tracking-widest text-forest hover:opacity-70 transition-opacity"
+                >
+                  Log In
+                </Link>
+                <Link
+                  href="/startups"
+                  className="px-6 xl:px-8 py-3 bg-forest text-white text-xs font-bold uppercase tracking-widest hover:bg-forest/90 transition-all shadow-lg shadow-forest/10"
+                >
+                  Join the Hub
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      </nav>
+
+      {/* ── Mobile Bottom Bar ── */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-forest/10">
+
+        {/* Mobile auth / dashboard strip */}
+        {isLoggedIn ? (
+          <div className="px-4 py-2 border-b border-forest/10">
             <Link
-              href="/profile"
-              className="text-sm font-bold uppercase tracking-widest text-forest hover:opacity-70 transition-opacity"
+              href="/dashboard"
+              className="flex items-center justify-center gap-2 w-full py-2 bg-forest text-white text-xs font-bold uppercase tracking-widest hover:bg-forest/90 transition-colors shadow-sm"
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              Dashboard
+            </Link>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 px-4 py-2 border-b border-forest/10">
+            <Link
+              href="/auth/login"
+              className="flex-1 text-center py-2 text-xs font-bold uppercase tracking-widest text-forest border border-forest/30 hover:bg-forest/5 transition-colors"
             >
               Log In
             </Link>
             <Link
               href="/startups"
-              className="px-6 xl:px-8 py-3 bg-forest text-white text-xs font-bold uppercase tracking-widest hover:bg-forest/90 transition-all shadow-lg shadow-forest/10"
+              className="flex-1 text-center py-2 bg-forest text-white text-xs font-bold uppercase tracking-widest hover:bg-forest/90 transition-colors shadow-sm"
             >
               Join the Hub
             </Link>
           </div>
-        </div>
-      </nav>
+        )}
 
-      {/*
-        ── Bottom Tab Bar ────────────────────────────────────────────────────
-        Always in the DOM. Always visible on mobile (lg:hidden).
-        No conditions — no flicker, no hydration issues.
-      */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-forest/10">
+        {/* Tab bar */}
         <nav
           className="flex items-center justify-around px-1"
           style={{ height: "56px", paddingBottom: "env(safe-area-inset-bottom)" }}

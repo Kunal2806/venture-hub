@@ -4,11 +4,11 @@ import { useEffect, useState, useCallback, useTransition } from "react";
 import {
   Search, ChevronLeft, ChevronRight,
   ExternalLink, CheckCircle2, XCircle, Clock,
-  Loader2, RefreshCw, Rocket, AlertCircle,
+  Loader2, RefreshCw, AlertCircle,
   Globe, Mail, Phone, FileText, X,
   ChevronRight as ChevronRightIcon,
   User, MapPin, TrendingUp, Calendar,
-  Filter, Eye, Briefcase, Sprout,
+  Filter, Briefcase,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -17,6 +17,14 @@ type AppStatus = "SUBMITTED" | "UNDER_REVIEW" | "APPROVED" | "REJECTED";
 type FundingStage =
   | "IDEA" | "PRE_SEED" | "SEED"
   | "SERIES_A" | "SERIES_B" | "SERIES_C" | "GROWTH";
+
+interface Description {
+  impact?: string | null;
+  metrics?: string | null;
+  useOfFunds?: string | null;
+  period?: string | null;
+  capital?: string | null;
+}
 
 interface Application {
   id: string;
@@ -28,7 +36,7 @@ interface Application {
   sector: string;
   stage: FundingStage;
   country: string | null;
-  description: string | null;
+  description: Description;
   pitchDeckUrl: string | null;
   status: AppStatus;
   reviewNotes: string | null;
@@ -51,31 +59,31 @@ const STATUS_CONFIG: Record<AppStatus, {
   icon: React.ReactNode;
   bg: string;
 }> = {
-  SUBMITTED: { 
-    label: "Submitted", 
-    classes: "bg-blue-50/50 text-blue-700 border-blue-200/50", 
-    dot: "bg-blue-500", 
+  SUBMITTED: {
+    label: "Submitted",
+    classes: "bg-blue-50/50 text-blue-700 border-blue-200/50",
+    dot: "bg-blue-500",
     icon: <FileText className="h-3 w-3 lg:h-4 lg:w-4" />,
     bg: "bg-blue-50"
   },
-  UNDER_REVIEW: { 
-    label: "Under Review", 
-    classes: "bg-amber-50/50 text-amber-700 border-amber-200/50", 
-    dot: "bg-amber-500", 
+  UNDER_REVIEW: {
+    label: "Under Review",
+    classes: "bg-amber-50/50 text-amber-700 border-amber-200/50",
+    dot: "bg-amber-500",
     icon: <Clock className="h-3 w-3 lg:h-4 lg:w-4" />,
     bg: "bg-amber-50"
   },
-  APPROVED: { 
-    label: "Approved", 
-    classes: "bg-emerald-50/50 text-emerald-700 border-emerald-200/50", 
-    dot: "bg-emerald-500", 
+  APPROVED: {
+    label: "Approved",
+    classes: "bg-emerald-50/50 text-emerald-700 border-emerald-200/50",
+    dot: "bg-emerald-500",
     icon: <CheckCircle2 className="h-3 w-3 lg:h-4 lg:w-4" />,
     bg: "bg-emerald-50"
   },
-  REJECTED: { 
-    label: "Rejected", 
-    classes: "bg-red-50/50 text-red-600 border-red-200/50", 
-    dot: "bg-red-500", 
+  REJECTED: {
+    label: "Rejected",
+    classes: "bg-red-50/50 text-red-600 border-red-200/50",
+    dot: "bg-red-500",
     icon: <XCircle className="h-3 w-3 lg:h-4 lg:w-4" />,
     bg: "bg-red-50"
   },
@@ -102,15 +110,66 @@ function fmtRelativeDate(iso: string) {
   const now = new Date();
   const diffTime = now.getTime() - date.getTime();
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  
+
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return "Yesterday";
   if (diffDays < 7) return `${diffDays}d ago`;
   return fmtDate(iso);
 }
 
+function fmtCapital(value: string | null | undefined): string {
+  if (!value) return "—";
+  const num = Number(value.toString().replace(/,/g, ""));
+  if (isNaN(num)) return value;
+  return num.toLocaleString("en-IN");
+}
+
 function initials(name: string) {
   return name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
+}
+
+// ── Safe description parser ────────────────────────────────────────────────
+// Handles three formats the DB might return:
+//   1. Already a plain object  → return as-is
+//   2. JSON string             → parse it
+//   3. Labelled plain text     → split on known keys
+//      e.g. "Impact: ...\nMetrics: ...\nUse of Funds: ...\nPeriod: ...\nCapital: ..."
+function parseDescription(raw: unknown): Description {
+  if (!raw) return {};
+
+  // Case 1: already an object
+  if (typeof raw === "object") return raw as Description;
+
+  if (typeof raw === "string") {
+    // Case 2: try JSON first
+    try { return JSON.parse(raw) as Description; } catch { /* fall through */ }
+
+    // Case 3: labelled plain-text format
+    // Split at each known label using a look-ahead so the label is kept in each segment
+    const result: Description = {};
+    const segments = raw
+      .split(/(?=Impact:|Metrics:|Use of Funds:|Period:|Capital:)/i)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    for (const segment of segments) {
+      const colonIdx = segment.indexOf(":");
+      if (colonIdx === -1) continue;
+      const key   = segment.slice(0, colonIdx).trim().toLowerCase();
+      const value = segment.slice(colonIdx + 1).trim();
+      if (!value) continue;
+
+      if (key === "impact")            result.impact     = value;
+      else if (key === "metrics")      result.metrics    = value;
+      else if (key === "use of funds") result.useOfFunds = value;
+      else if (key === "period")       result.period     = value;
+      else if (key === "capital")      result.capital    = value;
+    }
+
+    return result;
+  }
+
+  return {};
 }
 
 // ── Main Page ──────────────────────────────────────────────────────────────
@@ -136,7 +195,14 @@ export default function StartupApplicationsPage() {
       });
       const res = await fetch(`/api/admin/startup-applications?${params}`);
       const json = await res.json();
-      setApplications(json.data || []);
+
+      // Normalise description for every application coming from the API
+      const normalised = (json.data || []).map((app: Application) => ({
+        ...app,
+        description: parseDescription(app.description),
+      }));
+
+      setApplications(normalised);
       setMeta(json.meta || { total: 0, page: 1, limit: 20, totalPages: 0 });
     } finally { setLoading(false); }
   }, [page, statusFilter, search]);
@@ -159,7 +225,7 @@ export default function StartupApplicationsPage() {
 
   useEffect(() => { fetchApplications(); }, [fetchApplications]);
   useEffect(() => { fetchCounts(); }, [fetchCounts]);
-  
+
   useEffect(() => {
     const t = setTimeout(() => setPage(1), 400);
     return () => clearTimeout(t);
@@ -226,7 +292,7 @@ export default function StartupApplicationsPage() {
               onClick={() => { fetchApplications(); fetchCounts(); }}
               className="flex items-center gap-2 px-4 py-2 lg:px-5 lg:py-2.5 rounded-lg border border-[#1A362B]/10 text-xs lg:text-sm font-medium text-[#1A362B] hover:bg-[#F9F7F2] transition-colors"
             >
-              <RefreshCw className={`h-3.5 w-3.5 lg:h-4 lg:w-4 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-3.5 w-3.5 lg:h-4 lg:w-4 ${loading ? "animate-spin" : ""}`} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
             <button className="flex items-center gap-2 px-4 py-2 lg:px-5 lg:py-2.5 bg-[#1A362B] text-white rounded-lg text-xs lg:text-sm font-medium hover:bg-[#1A362B]/90 transition-colors">
@@ -269,7 +335,7 @@ export default function StartupApplicationsPage() {
 
         {/* Filter Bar */}
         <div className="bg-white rounded-xl border border-[#1A362B]/10 overflow-hidden">
-          {/* Tabs - Horizontal Scroll on Mobile */}
+          {/* Tabs */}
           <div className="overflow-x-auto hide-scrollbar border-b border-[#1A362B]/10">
             <div className="flex min-w-max sm:min-w-0 px-2">
               {tabs.map((t) => {
@@ -285,7 +351,7 @@ export default function StartupApplicationsPage() {
                     {t.value && counts[t.value] != null && (
                       <span
                         className="ml-2 px-1.5 py-0.5 lg:px-2 lg:py-1 rounded-full text-[10px] lg:text-xs font-bold"
-                        style={{ 
+                        style={{
                           backgroundColor: active ? `${FOREST}15` : BEIGE,
                           color: active ? FOREST : "#4A5D4E"
                         }}
@@ -311,8 +377,8 @@ export default function StartupApplicationsPage() {
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by company, founder or email..."
                 className="w-full pl-9 lg:pl-10 pr-4 py-2.5 lg:py-3 text-sm lg:text-base rounded-lg outline-none transition-all border"
-                style={{ 
-                  backgroundColor: CREAM, 
+                style={{
+                  backgroundColor: CREAM,
                   borderColor: `${FOREST}15`,
                   color: "#2D2D2D"
                 }}
@@ -341,7 +407,7 @@ export default function StartupApplicationsPage() {
             ))}
           </div>
 
-          {/* Mobile/Tablet Headers */}
+          {/* Mobile Headers */}
           <div className="lg:hidden grid grid-cols-[1fr,auto] gap-4 px-4 py-3 bg-[#F9F7F2]/50 border-b border-[#1A362B]/10">
             <span className="text-[10px] font-bold uppercase tracking-wider text-[#1A362B]/50">Application</span>
             <span className="text-[10px] font-bold uppercase tracking-wider text-[#1A362B]/50">Status</span>
@@ -364,7 +430,7 @@ export default function StartupApplicationsPage() {
               {applications.map((app) => {
                 const cfg = STATUS_CONFIG[app.status];
                 const isOpen = selected?.id === app.id && drawerOpen;
-                
+
                 return (
                   <div
                     key={app.id}
@@ -374,9 +440,8 @@ export default function StartupApplicationsPage() {
                       borderLeft: isOpen ? `3px solid ${FOREST}` : "3px solid transparent",
                     }}
                   >
-                    {/* Desktop Layout */}
+                    {/* Desktop */}
                     <div className="hidden lg:grid grid-cols-[2fr,1.5fr,1fr,1fr,120px,40px] gap-4 px-5 py-5 items-center">
-                      {/* Company */}
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-10 h-10 rounded-lg bg-[#1A362B]/10 flex items-center justify-center text-[#1A362B] font-bold text-sm flex-shrink-0">
                           {initials(app.companyName)}
@@ -387,42 +452,32 @@ export default function StartupApplicationsPage() {
                           <p className="text-xs text-[#1A362B]/30 mt-0.5">{fmtRelativeDate(app.createdAt)}</p>
                         </div>
                       </div>
-
-                      {/* Contact */}
                       <div className="min-w-0">
                         <p className="text-sm text-[#1A362B] truncate">{app.email}</p>
                         {app.mobile && (
                           <p className="text-xs text-[#1A362B]/50 mt-1">{app.mobile}</p>
                         )}
                       </div>
-
-                      {/* Sector */}
                       <div>
                         <span className="text-sm text-[#1A362B]">{app.sector}</span>
                       </div>
-
-                      {/* Stage */}
                       <div>
                         <span className="text-xs px-2 py-1 rounded-md bg-[#1A362B]/5 text-[#1A362B] font-medium">
                           {STAGE_LABELS[app.stage]}
                         </span>
                       </div>
-
-                      {/* Status */}
                       <div>
                         <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border w-fit ${cfg.classes}`}>
                           <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
                           {cfg.label}
                         </span>
                       </div>
-
-                      {/* Arrow */}
                       <div className="flex justify-end">
                         <ChevronRightIcon className="h-5 w-5 text-[#1A362B]/30 group-hover:text-[#1A362B] group-hover:translate-x-0.5 transition-all" />
                       </div>
                     </div>
 
-                    {/* Mobile/Tablet Layout */}
+                    {/* Mobile */}
                     <div className="lg:hidden px-4 py-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -460,7 +515,7 @@ export default function StartupApplicationsPage() {
           {meta.totalPages > 1 && (
             <div className="flex items-center justify-between px-5 py-4 border-t border-[#1A362B]/10 bg-[#F9F7F2]/50">
               <p className="text-xs lg:text-sm text-[#1A362B]/50">
-                Showing {(meta.page - 1) * meta.limit + 1}-
+                Showing {(meta.page - 1) * meta.limit + 1}–
                 {Math.min(meta.page * meta.limit, meta.total)} of {meta.total}
               </p>
               <div className="flex items-center gap-2">
@@ -527,14 +582,18 @@ function ReviewDrawer({
 
   if (!app) return null;
 
+  const desc = app.description ?? {};
+  const hasBusinessDetails =
+    desc.impact || desc.metrics || desc.useOfFunds || desc.period || desc.capital;
+
   return (
     <>
       {/* Backdrop */}
       <div
         className="fixed inset-0 z-30 transition-opacity duration-300 pointer-events-none"
-        style={{ 
+        style={{
           backgroundColor: "rgba(26,54,43,0.2)",
-          opacity: open ? 1 : 0 
+          opacity: open ? 1 : 0
         }}
       />
 
@@ -566,7 +625,7 @@ function ReviewDrawer({
               <X className="h-4 w-4 lg:h-5 lg:w-5 text-[#1A362B]/50" />
             </button>
           </div>
-          
+
           {/* Status Bar */}
           <div className="flex items-center gap-3 px-5 lg:px-6 pb-4 lg:pb-5">
             {cfg && (
@@ -584,13 +643,14 @@ function ReviewDrawer({
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-5 lg:p-6 space-y-6 lg:space-y-8">
+
           {/* Key Details Grid */}
           <div className="grid grid-cols-2 gap-3 lg:gap-4">
             {[
               { icon: <User className="h-3.5 w-3.5 lg:h-4 lg:w-4" />, label: "Stage", value: STAGE_LABELS[app.stage] },
               { icon: <Briefcase className="h-3.5 w-3.5 lg:h-4 lg:w-4" />, label: "Sector", value: app.sector },
               { icon: <MapPin className="h-3.5 w-3.5 lg:h-4 lg:w-4" />, label: "Country", value: app.country || "—" },
-              { icon: <TrendingUp className="h-3.5 w-3.5 lg:h-4 lg:w-4" />, label: "ID", value: app.id.slice(0, 8) + "..." },
+              { icon: <TrendingUp className="h-3.5 w-3.5 lg:h-4 lg:w-4" />, label: "ID", value: app.id.slice(0, 8) + "…" },
             ].map(({ icon, label, value }) => (
               <div key={label} className="p-3 lg:p-4 rounded-lg bg-[#F9F7F2]">
                 <div className="flex items-center gap-2 mb-1">
@@ -628,15 +688,23 @@ function ReviewDrawer({
               <h3 className="text-[10px] lg:text-xs font-bold uppercase tracking-wider text-[#1A362B]/50 mb-3">Links</h3>
               <div className="flex flex-wrap gap-2">
                 {app.websiteUrl && (
-                  <a href={app.websiteUrl} target="_blank" rel="noopener noreferrer" 
-                     className="flex items-center gap-2 px-3 py-2 lg:px-4 lg:py-2.5 rounded-lg border border-[#1A362B]/10 hover:bg-[#F9F7F2] transition-colors">
+                  <a
+                    href={app.websiteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-3 py-2 lg:px-4 lg:py-2.5 rounded-lg border border-[#1A362B]/10 hover:bg-[#F9F7F2] transition-colors"
+                  >
                     <Globe className="h-3.5 w-3.5 lg:h-4 lg:w-4 text-[#1A362B]" />
                     <span className="text-xs lg:text-sm text-[#1A362B]">Website</span>
                   </a>
                 )}
                 {app.pitchDeckUrl && (
-                  <a href={app.pitchDeckUrl} target="_blank" rel="noopener noreferrer"
-                     className="flex items-center gap-2 px-3 py-2 lg:px-4 lg:py-2.5 rounded-lg border border-[#1A362B]/10 hover:bg-[#F9F7F2] transition-colors">
+                  <a
+                    href={app.pitchDeckUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-3 py-2 lg:px-4 lg:py-2.5 rounded-lg border border-[#1A362B]/10 hover:bg-[#F9F7F2] transition-colors"
+                  >
                     <FileText className="h-3.5 w-3.5 lg:h-4 lg:w-4 text-[#1A362B]" />
                     <span className="text-xs lg:text-sm text-[#1A362B]">Pitch Deck</span>
                   </a>
@@ -645,13 +713,54 @@ function ReviewDrawer({
             </div>
           )}
 
-          {/* Description */}
-          {app.description && (
-            <div>
-              <h3 className="text-[10px] lg:text-xs font-bold uppercase tracking-wider text-[#1A362B]/50 mb-3">About</h3>
-              <p className="text-sm lg:text-base leading-relaxed p-4 lg:p-5 rounded-lg bg-[#F9F7F2] text-[#1A362B]">
-                {app.description}
-              </p>
+          {/* Business Details — only renders when at least one field exists */}
+          {hasBusinessDetails && (
+            <div className="space-y-4">
+              <h3 className="text-[10px] lg:text-xs font-bold uppercase tracking-wider text-[#1A362B]/50">
+                Business Details
+              </h3>
+
+              <div className="space-y-3">
+                {desc.impact && (
+                  <div className="p-4 rounded-lg bg-[#F9F7F2]">
+                    <p className="text-xs font-semibold text-[#1A362B]/60 mb-1">Impact</p>
+                    <p className="text-sm text-[#1A362B] leading-relaxed">{desc.impact}</p>
+                  </div>
+                )}
+
+                {desc.metrics && (
+                  <div className="p-4 rounded-lg bg-[#F9F7F2]">
+                    <p className="text-xs font-semibold text-[#1A362B]/60 mb-1">Metrics</p>
+                    <p className="text-sm text-[#1A362B] leading-relaxed">{desc.metrics}</p>
+                  </div>
+                )}
+
+                {desc.useOfFunds && (
+                  <div className="p-4 rounded-lg bg-[#F9F7F2]">
+                    <p className="text-xs font-semibold text-[#1A362B]/60 mb-1">Use of Funds</p>
+                    <p className="text-sm text-[#1A362B] leading-relaxed">{desc.useOfFunds}</p>
+                  </div>
+                )}
+
+                {(desc.period || desc.capital) && (
+                  <div className="grid grid-cols-2 gap-3">
+                    {desc.period && (
+                      <div className="p-4 rounded-lg bg-[#F9F7F2]">
+                        <p className="text-xs font-semibold text-[#1A362B]/60 mb-1">Period (months)</p>
+                        <p className="text-sm font-medium text-[#1A362B]">{desc.period}</p>
+                      </div>
+                    )}
+                    {desc.capital && (
+                      <div className="p-4 rounded-lg bg-[#F9F7F2]">
+                        <p className="text-xs font-semibold text-[#1A362B]/60 mb-1">Capital</p>
+                        <p className="text-sm font-medium text-[#1A362B]">
+                          ₹ {fmtCapital(desc.capital)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -659,7 +768,11 @@ function ReviewDrawer({
           <div>
             <h3 className="text-[10px] lg:text-xs font-bold uppercase tracking-wider text-[#1A362B]/50 mb-3">
               Review Notes
-              {canAct && <span className="ml-2 text-[8px] lg:text-[10px] normal-case font-normal">(shared with founder)</span>}
+              {canAct && (
+                <span className="ml-2 text-[8px] lg:text-[10px] normal-case font-normal">
+                  (shared with founder)
+                </span>
+              )}
             </h3>
             {canAct ? (
               <textarea
@@ -679,7 +792,7 @@ function ReviewDrawer({
             )}
           </div>
 
-          {/* Reviewed Info */}
+          {/* Reviewed timestamp */}
           {!canAct && app.reviewedAt && (
             <div className="flex items-center gap-2 p-3 lg:p-4 rounded-lg bg-[#F9F7F2]">
               {cfg?.icon}
@@ -758,7 +871,10 @@ function ReviewDrawer({
                     onClick={() => setConfirmAction("approve")}
                     className="flex-1 px-4 py-2.5 lg:px-5 lg:py-3 rounded-lg bg-[#1A362B] text-white text-xs lg:text-sm font-medium hover:bg-[#1A362B]/90 transition-colors flex items-center justify-center gap-2"
                   >
-                    {isPending ? <Loader2 className="h-3 w-3 lg:h-4 lg:w-4 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 lg:h-4 lg:w-4" />}
+                    {isPending
+                      ? <Loader2 className="h-3 w-3 lg:h-4 lg:w-4 animate-spin" />
+                      : <CheckCircle2 className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
+                    }
                     Approve
                   </button>
                 </div>
@@ -779,15 +895,9 @@ function ReviewDrawer({
         )}
       </div>
 
-      {/* Global styles for hide-scrollbar */}
       <style jsx global>{`
-        .hide-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        .hide-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
     </>
   );

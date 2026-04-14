@@ -1,7 +1,6 @@
-// actions/changePassword.ts
 "use server";
 
-import { auth } from "@/auth";
+import { auth, unstable_update } from "@/auth";
 import { db } from "@/db";
 import { UsersTable } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -65,14 +64,19 @@ export async function changePassword(
 
   const hashedNew = await bcrypt.hash(newPassword, 10);
 
+  // Update DB
   await db
     .update(UsersTable)
     .set({
       password:           hashedNew,
-      mustChangePassword: false,   // clear the forced-change flag
+      mustChangePassword: false,
       updatedAt:          new Date(),
     })
     .where(eq(UsersTable.id, user.id));
 
+  // Force the JWT cookie to be rewritten with mustChangePassword: false.
+  // Without this, the middleware reads the stale token from the cookie and
+  // keeps redirecting back to /auth/change-password.
+ await unstable_update({ user: { mustChangePassword: false } } as any);
   return { success: "Password updated successfully!" };
 }
