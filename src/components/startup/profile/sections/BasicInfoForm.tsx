@@ -3,7 +3,10 @@
 import { useRef, useState, useTransition } from "react";
 import { updateBasicInfo } from "../actions";
 import type { StartupProfile } from "@/db/schema";
-import { AlertCircle, CheckCircle, Globe, Building2, MapPin, Calendar, Tag, AlignLeft } from "lucide-react";
+import {
+  AlertCircle, CheckCircle, Globe, Building2,
+  MapPin, Calendar, Tag, AlignLeft, Leaf, BarChart2, Wallet, Clock,
+} from "lucide-react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -23,12 +26,16 @@ const SECTORS = [
   "Media & Entertainment", "Real Estate", "Consumer", "B2B", "Deep Tech", "Other",
 ];
 
-const CURRENT_YEAR = new Date().getFullYear();
-const MIN_YEAR = 1900;
-
-const DESCRIPTION_MIN = 50;
-const DESCRIPTION_MAX = 1000;
-const TAGLINE_MAX     = 160;
+const CURRENT_YEAR      = new Date().getFullYear();
+const MIN_YEAR          = 1900;
+const DESCRIPTION_MIN   = 50;
+const DESCRIPTION_MAX   = 1000;
+const TAGLINE_MAX       = 160;
+const IMPACT_DESC_MAX   = 1000;
+const IMPACT_METRICS_MAX = 300;
+const USE_OF_FUNDS_MAX  = 800;
+const FUNDING_PERIOD_MAX = 100;
+const CAPITAL_MAX       = 100;
 
 // ─── Helper components ────────────────────────────────────────────────────────
 
@@ -62,20 +69,11 @@ function FieldSuccess({ message }: { message?: string }) {
   );
 }
 
-/** Character count bar shown beneath textarea / tagline */
-function CharBar({
-  current,
-  max,
-  min,
-}: {
-  current: number;
-  max: number;
-  min?: number;
-}) {
-  const pct     = Math.min((current / max) * 100, 100);
-  const tooLong = current > max;
+function CharBar({ current, max, min }: { current: number; max: number; min?: number }) {
+  const pct      = Math.min((current / max) * 100, 100);
+  const tooLong  = current > max;
   const tooShort = min !== undefined && current > 0 && current < min;
-  const color   = tooLong
+  const color    = tooLong
     ? "bg-red-400"
     : tooShort
     ? "bg-amber-400"
@@ -86,17 +84,12 @@ function CharBar({
   return (
     <div className="mt-2 space-y-1">
       <div className="h-1 w-full rounded-full bg-forest/10 overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-300 ${color}`}
-          style={{ width: `${pct}%` }}
-        />
+        <div className={`h-full rounded-full transition-all duration-300 ${color}`} style={{ width: `${pct}%` }} />
       </div>
       <div className="flex justify-between text-[10px] text-forest/40">
         {min !== undefined && current > 0 && current < min ? (
           <span className="text-amber-500">{min - current} more characters needed</span>
-        ) : (
-          <span />
-        )}
+        ) : <span />}
         <span className={`ml-auto ${tooLong ? "text-red-500 font-medium" : ""}`}>
           {current} / {max}
         </span>
@@ -118,120 +111,112 @@ function validateAll(fields: Record<string, string>): ValidationResult {
   const warnings: Record<string, string> = {};
   const success:  Record<string, string> = {};
 
-  // ── Company Name ────────────────────────────────────────────────────────────
+  // Company Name
   const name = fields.companyName?.trim() ?? "";
-  if (!name) {
-    errors.companyName = "Company name is required.";
-  } else if (name.length < 2) {
-    errors.companyName = "Company name must be at least 2 characters.";
-  } else if (name.length > 100) {
-    errors.companyName = "Company name must be under 100 characters.";
-  } else if (/^\d+$/.test(name)) {
-    errors.companyName = "Company name cannot be numbers only.";
-  } else {
-    success.companyName = "Looks good";
-  }
+  if (!name)                           errors.companyName   = "Company name is required.";
+  else if (name.length < 2)            errors.companyName   = "Must be at least 2 characters.";
+  else if (name.length > 100)          errors.companyName   = "Must be under 100 characters.";
+  else if (/^\d+$/.test(name))         errors.companyName   = "Cannot be numbers only.";
+  else                                 success.companyName  = "Looks good";
 
-  // ── Tagline ─────────────────────────────────────────────────────────────────
+  // Tagline
   const tagline = fields.tagline?.trim() ?? "";
   if (tagline) {
-    if (tagline.length < 10) {
-      warnings.tagline = "A tagline works best with at least 10 characters.";
-    } else if (tagline.length > TAGLINE_MAX) {
-      errors.tagline = `Tagline must be under ${TAGLINE_MAX} characters.`;
-    } else {
-      success.tagline = "Good tagline length";
-    }
+    if (tagline.length < 10)           warnings.tagline     = "Works best with at least 10 characters.";
+    else if (tagline.length > TAGLINE_MAX) errors.tagline   = `Must be under ${TAGLINE_MAX} characters.`;
+    else                               success.tagline      = "Good tagline length";
   }
 
-  // ── Website URL ─────────────────────────────────────────────────────────────
+  // Website URL
   const url = fields.websiteUrl?.trim() ?? "";
   if (url) {
-    if (!/^https?:\/\//i.test(url)) {
-      errors.websiteUrl = "URL must start with https:// or http://";
-    } else {
+    if (!/^https?:\/\//i.test(url))    errors.websiteUrl    = "Must start with https:// or http://";
+    else {
       try {
         const parsed = new URL(url);
-        if (!parsed.hostname.includes(".")) {
-          errors.websiteUrl = "Enter a valid domain — e.g. https://yourcompany.com";
-        } else if (!url.startsWith("https://")) {
-          warnings.websiteUrl = "Consider using https:// for a secure link.";
-        } else {
-          success.websiteUrl = "Valid URL";
-        }
-      } catch {
-        errors.websiteUrl = "That doesn't look like a valid URL.";
-      }
+        if (!parsed.hostname.includes("."))  errors.websiteUrl   = "Enter a valid domain.";
+        else if (!url.startsWith("https://")) warnings.websiteUrl = "Consider using https://.";
+        else                                  success.websiteUrl  = "Valid URL";
+      } catch { errors.websiteUrl = "That doesn't look like a valid URL."; }
     }
   } else {
     warnings.websiteUrl = "Adding a website builds credibility with investors.";
   }
 
-  // ── Founded Year ────────────────────────────────────────────────────────────
+  // Founded Year
   const year = fields.foundedYear?.trim() ?? "";
   if (year) {
-    if (!/^\d{4}$/.test(year)) {
-      errors.foundedYear = "Must be a 4-digit year (e.g. 2019).";
-    } else {
+    if (!/^\d{4}$/.test(year))         errors.foundedYear   = "Must be a 4-digit year.";
+    else {
       const y = parseInt(year, 10);
-      if (y < MIN_YEAR) {
-        errors.foundedYear = `Year must be ${MIN_YEAR} or later.`;
-      } else if (y > CURRENT_YEAR) {
-        errors.foundedYear = `Year cannot be in the future.`;
-      } else if (y > CURRENT_YEAR - 1) {
-        warnings.foundedYear = "Just founded — welcome to the journey!";
-      } else {
-        success.foundedYear = "Valid year";
-      }
+      if (y < MIN_YEAR)                errors.foundedYear   = `Year must be ${MIN_YEAR} or later.`;
+      else if (y > CURRENT_YEAR)       errors.foundedYear   = "Year cannot be in the future.";
+      else if (y > CURRENT_YEAR - 1)   warnings.foundedYear = "Just founded — welcome!";
+      else                             success.foundedYear  = "Valid year";
     }
   }
 
-  // ── Sector ──────────────────────────────────────────────────────────────────
-  if (!fields.sector) {
-    errors.sector = "Please select your primary sector.";
-  } else {
-    success.sector = "Selected";
-  }
+  // Sector
+  if (!fields.sector) errors.sector = "Please select your primary sector.";
+  else success.sector = "Selected";
 
-  // ── Stage ───────────────────────────────────────────────────────────────────
-  if (!fields.stage) {
-    errors.stage = "Please select your current stage.";
-  } else {
-    success.stage = "Selected";
-  }
+  // Stage
+  if (!fields.stage) errors.stage = "Please select your current stage.";
+  else success.stage = "Selected";
 
-  // ── Country ─────────────────────────────────────────────────────────────────
+  // Country
   const country = fields.country?.trim() ?? "";
-  if (!country) {
-    warnings.country = "Adding your country helps match you with regional investors.";
-  } else if (country.length < 2) {
-    errors.country = "Enter a valid country name.";
-  } else if (/\d/.test(country)) {
-    errors.country = "Country name should not contain numbers.";
-  }
+  if (!country)                        warnings.country  = "Helps match you with regional investors.";
+  else if (country.length < 2)         errors.country    = "Enter a valid country name.";
+  else if (/\d/.test(country))         errors.country    = "Country name should not contain numbers.";
 
-  // ── City ────────────────────────────────────────────────────────────────────
+  // City
   const city = fields.city?.trim() ?? "";
-  if (city && /\d/.test(city)) {
-    errors.city = "City name should not contain numbers.";
+  if (city && /\d/.test(city))         errors.city       = "City name should not contain numbers.";
+
+  // Description (about the company)
+  const desc = fields.description?.trim() ?? "";
+  if (!desc)                           warnings.description = "Helps investors understand you faster.";
+  else if (desc.length < DESCRIPTION_MIN) warnings.description = `Add ${DESCRIPTION_MIN - desc.length} more characters.`;
+  else if (desc.length > DESCRIPTION_MAX) errors.description  = `Must be under ${DESCRIPTION_MAX} characters.`;
+  else                                 success.description    = "Great — this adds real depth.";
+
+  // Impact Description
+  const impact = fields.impactDescription?.trim() ?? "";
+  if (impact) {
+    if (impact.length < 30)            warnings.impactDescription = "A bit more detail helps reviewers.";
+    else if (impact.length > IMPACT_DESC_MAX) errors.impactDescription = `Must be under ${IMPACT_DESC_MAX} characters.`;
+    else                               success.impactDescription  = "Great impact description.";
+  } else {
+    warnings.impactDescription = "Founders who describe their impact get reviewed 2× faster.";
   }
 
-  // ── Description ─────────────────────────────────────────────────────────────
-  const desc = fields.description?.trim() ?? "";
-  if (!desc) {
-    warnings.description = "A description helps investors and partners understand you faster.";
-  } else if (desc.length < DESCRIPTION_MIN) {
-    warnings.description = `Add ${DESCRIPTION_MIN - desc.length} more characters for a meaningful description.`;
-  } else if (desc.length > DESCRIPTION_MAX) {
-    errors.description = `Description must be under ${DESCRIPTION_MAX} characters.`;
-  } else {
-    success.description = "Great — this adds real depth to your profile.";
+  // Impact Metrics
+  const metrics = fields.impactMetrics?.trim() ?? "";
+  if (metrics && metrics.length > IMPACT_METRICS_MAX) {
+    errors.impactMetrics = `Must be under ${IMPACT_METRICS_MAX} characters.`;
   }
+
+  // Use of Funds
+  const uof = fields.useOfFunds?.trim() ?? "";
+  if (!uof)                            warnings.useOfFunds = "A brief breakdown increases reviewer confidence.";
+  else if (uof.length > USE_OF_FUNDS_MAX) errors.useOfFunds = `Must be under ${USE_OF_FUNDS_MAX} characters.`;
+  else                                 success.useOfFunds  = "Looks good";
+
+  // Funding Period
+  const fp = fields.fundingPeriod?.trim() ?? "";
+  if (!fp)                             warnings.fundingPeriod = "Let investors know your expected runway period.";
+  else if (fp.length > FUNDING_PERIOD_MAX) errors.fundingPeriod = `Must be under ${FUNDING_PERIOD_MAX} characters.`;
+  else                                 success.fundingPeriod  = "Looks good";
+
+  // Capital Requested
+  const cap = fields.capitalRequested?.trim() ?? "";
+  if (!cap)                            warnings.capitalRequested = "Specifying an amount helps investors assess fit quickly.";
+  else if (cap.length > CAPITAL_MAX)   errors.capitalRequested   = `Must be under ${CAPITAL_MAX} characters.`;
+  else                                 success.capitalRequested  = "Looks good";
 
   return { errors, warnings, success };
 }
-
-// ─── Field input class helper ─────────────────────────────────────────────────
 
 function fieldCls(
   base: string,
@@ -259,24 +244,26 @@ type Props = {
 export default function BasicInfoForm({ profile, userId, onSaved }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
-  const [result, setResult]   = useState<{ success: boolean; message?: string } | null>(null);
+  const [result,   setResult]   = useState<{ success: boolean; message?: string } | null>(null);
   const [errors,   setErrors]   = useState<Record<string, string>>({});
   const [warnings, setWarnings] = useState<Record<string, string>>({});
   const [success,  setSuccess]  = useState<Record<string, string>>({});
+  const [touched,  setTouched]  = useState<Record<string, boolean>>({});
 
-  // Live character counts for text inputs with bars
-  const [taglineLen,     setTaglineLen]     = useState(profile.tagline?.length ?? 0);
-  const [descLen,        setDescLen]        = useState(profile.description?.length ?? 0);
-  const [touched,        setTouched]        = useState<Record<string, boolean>>({});
+  // Live char counts
+  const [taglineLen,       setTaglineLen]       = useState(profile.tagline?.length           ?? 0);
+  const [descLen,          setDescLen]          = useState(profile.description?.length        ?? 0);
+  const [impactDescLen,    setImpactDescLen]    = useState(profile.impactDescription?.length  ?? 0);
+  const [impactMetricsLen, setImpactMetricsLen] = useState(0);
+  const [useOfFundsLen,    setUseOfFundsLen]    = useState(profile.useOfFunds?.length         ?? 0);
+  const [fundingPeriodLen, setFundingPeriodLen] = useState(0);
+  const [capitalLen,       setCapitalLen]       = useState(0);
 
-  // ── Live single-field validation on blur ──────────────────────────────────
   function revalidate() {
     if (!formRef.current) return;
     const fd     = new FormData(formRef.current);
-    const fields = Object.fromEntries(
-      Array.from(fd.entries()).map(([k, v]) => [k, v.toString()])
-    );
-    const res = validateAll(fields);
+    const fields = Object.fromEntries(Array.from(fd.entries()).map(([k, v]) => [k, v.toString()]));
+    const res    = validateAll(fields);
     setErrors(res.errors);
     setWarnings(res.warnings);
     setSuccess(res.success);
@@ -287,20 +274,15 @@ export default function BasicInfoForm({ profile, userId, onSaved }: Props) {
     revalidate();
   }
 
-  // ── Submit ────────────────────────────────────────────────────────────────
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd     = new FormData(e.currentTarget);
-    const fields = Object.fromEntries(
-      Array.from(fd.entries()).map(([k, v]) => [k, v.toString()])
-    );
-    const res = validateAll(fields);
+    const fields = Object.fromEntries(Array.from(fd.entries()).map(([k, v]) => [k, v.toString()]));
+    const res    = validateAll(fields);
     setErrors(res.errors);
     setWarnings(res.warnings);
     setSuccess(res.success);
-    // Mark all fields as touched so messages show
-    const allTouched = Object.fromEntries(Object.keys(fields).map(k => [k, true]));
-    setTouched(allTouched);
+    setTouched(Object.fromEntries(Object.keys(fields).map(k => [k, true])));
     if (Object.keys(res.errors).length > 0) return;
 
     startTransition(async () => {
@@ -310,23 +292,18 @@ export default function BasicInfoForm({ profile, userId, onSaved }: Props) {
     });
   }
 
-  // Helpers that only show messages for touched fields
   const err  = (id: string) => touched[id] ? errors[id]   : undefined;
   const warn = (id: string) => touched[id] ? warnings[id] : undefined;
   const suc  = (id: string) => touched[id] ? success[id]  : undefined;
   const cls  = (id: string) =>
-    touched[id]
-      ? fieldCls("input-field", id, errors, warnings, success)
-      : "input-field";
-
-  // ─────────────────────────────────────────────────────────────────────────
+    touched[id] ? fieldCls("input-field", id, errors, warnings, success) : "input-field";
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-8" noValidate>
       <input type="hidden" name="profileId" value={profile.id} />
       <input type="hidden" name="userId"    value={userId} />
 
-      {/* ── Section: Identity ── */}
+      {/* ── Identity ── */}
       <fieldset className="space-y-5">
         <legend className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-forest/50 mb-4">
           <Building2 className="w-3.5 h-3.5" />
@@ -339,50 +316,36 @@ export default function BasicInfoForm({ profile, userId, onSaved }: Props) {
             <label className="label-style" htmlFor="companyName">
               Company Name <span className="text-red-400">*</span>
             </label>
-            <span className="text-[10px] text-forest/30">
-              {(profile.companyName ?? "").length}/100
-            </span>
+            <span className="text-[10px] text-forest/30">{(profile.companyName ?? "").length}/100</span>
           </div>
           <input
-            id="companyName"
-            name="companyName"
-            maxLength={100}
+            id="companyName" name="companyName" maxLength={100}
             className={cls("companyName")}
             defaultValue={profile.companyName}
             placeholder="e.g. Aeris Technologies"
             onBlur={() => handleBlur("companyName")}
-            onChange={e => {
-              if (touched.companyName) revalidate();
-            }}
+            onChange={() => { if (touched.companyName) revalidate(); }}
           />
-          <FieldError   message={err("companyName")} />
-          <FieldWarning message={warn("companyName")} />
+          <FieldError message={err("companyName")} />
           <FieldSuccess message={suc("companyName")} />
         </div>
 
         {/* Tagline */}
         <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="label-style" htmlFor="tagline">
-              <span className="flex items-center gap-1.5">
-                <Tag className="w-3 h-3" />
-                Tagline
-                <span className="text-forest/30 font-normal normal-case text-[10px]">(optional)</span>
-              </span>
-            </label>
-          </div>
+          <label className="label-style" htmlFor="tagline">
+            <span className="flex items-center gap-1.5">
+              <Tag className="w-3 h-3" />
+              Tagline
+              <span className="text-forest/30 font-normal normal-case text-[10px]">(optional)</span>
+            </span>
+          </label>
           <input
-            id="tagline"
-            name="tagline"
-            maxLength={TAGLINE_MAX}
+            id="tagline" name="tagline" maxLength={TAGLINE_MAX}
             className={cls("tagline")}
             defaultValue={profile.tagline ?? ""}
             placeholder="One line that says it all"
             onBlur={() => handleBlur("tagline")}
-            onChange={e => {
-              setTaglineLen(e.target.value.length);
-              if (touched.tagline) revalidate();
-            }}
+            onChange={e => { setTaglineLen(e.target.value.length); if (touched.tagline) revalidate(); }}
           />
           <CharBar current={taglineLen} max={TAGLINE_MAX} min={10} />
           <FieldError   message={err("tagline")} />
@@ -391,7 +354,7 @@ export default function BasicInfoForm({ profile, userId, onSaved }: Props) {
         </div>
       </fieldset>
 
-      {/* ── Section: Classification ── */}
+      {/* ── Classification ── */}
       <fieldset className="space-y-5">
         <legend className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-forest/50 mb-4">
           <AlignLeft className="w-3.5 h-3.5" />
@@ -401,12 +364,9 @@ export default function BasicInfoForm({ profile, userId, onSaved }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           {/* Sector */}
           <div>
-            <label className="label-style" htmlFor="sector">
-              Sector <span className="text-red-400">*</span>
-            </label>
+            <label className="label-style" htmlFor="sector">Sector <span className="text-red-400">*</span></label>
             <select
-              id="sector"
-              name="sector"
+              id="sector" name="sector"
               className={`${cls("sector")} bg-transparent cursor-pointer appearance-none`}
               defaultValue={profile.sector}
               onBlur={() => handleBlur("sector")}
@@ -421,12 +381,9 @@ export default function BasicInfoForm({ profile, userId, onSaved }: Props) {
 
           {/* Stage */}
           <div>
-            <label className="label-style" htmlFor="stage">
-              Stage <span className="text-red-400">*</span>
-            </label>
+            <label className="label-style" htmlFor="stage">Stage <span className="text-red-400">*</span></label>
             <select
-              id="stage"
-              name="stage"
+              id="stage" name="stage"
               className={`${cls("stage")} bg-transparent cursor-pointer appearance-none`}
               defaultValue={profile.stage}
               onBlur={() => handleBlur("stage")}
@@ -449,27 +406,18 @@ export default function BasicInfoForm({ profile, userId, onSaved }: Props) {
               </span>
             </label>
             <input
-              id="foundedYear"
-              name="foundedYear"
-              maxLength={4}
-              inputMode="numeric"
-              pattern="\d{4}"
+              id="foundedYear" name="foundedYear" maxLength={4}
+              inputMode="numeric" pattern="\d{4}"
               className={cls("foundedYear")}
               defaultValue={profile.foundedYear?.toString() ?? ""}
               placeholder={String(CURRENT_YEAR - 2)}
               onBlur={() => handleBlur("foundedYear")}
-              onChange={e => {
-                // Only allow digits
-                e.target.value = e.target.value.replace(/\D/g, "");
-                if (touched.foundedYear) revalidate();
-              }}
+              onChange={e => { e.target.value = e.target.value.replace(/\D/g, ""); if (touched.foundedYear) revalidate(); }}
             />
             <FieldError   message={err("foundedYear")} />
             <FieldWarning message={warn("foundedYear")} />
             <FieldSuccess message={suc("foundedYear")} />
-            <p className="text-[10px] text-forest/30 mt-1">
-              4-digit year · {MIN_YEAR}–{CURRENT_YEAR}
-            </p>
+            <p className="text-[10px] text-forest/30 mt-1">4-digit year · {MIN_YEAR}–{CURRENT_YEAR}</p>
           </div>
 
           {/* Website */}
@@ -482,9 +430,7 @@ export default function BasicInfoForm({ profile, userId, onSaved }: Props) {
               </span>
             </label>
             <input
-              id="websiteUrl"
-              name="websiteUrl"
-              type="url"
+              id="websiteUrl" name="websiteUrl" type="url"
               className={cls("websiteUrl")}
               defaultValue={profile.websiteUrl ?? ""}
               placeholder="https://yourcompany.com"
@@ -498,24 +444,19 @@ export default function BasicInfoForm({ profile, userId, onSaved }: Props) {
         </div>
       </fieldset>
 
-      {/* ── Section: Location ── */}
+      {/* ── Location ── */}
       <fieldset className="space-y-5">
         <legend className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-forest/50 mb-4">
           <MapPin className="w-3.5 h-3.5" />
           Location
         </legend>
-
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          {/* Country */}
           <div>
             <label className="label-style" htmlFor="country">
-              Country
-              <span className="text-forest/30 font-normal normal-case text-[10px] ml-1">(optional)</span>
+              Country <span className="text-forest/30 font-normal normal-case text-[10px] ml-1">(optional)</span>
             </label>
             <input
-              id="country"
-              name="country"
-              className={cls("country")}
+              id="country" name="country" className={cls("country")}
               defaultValue={profile.country ?? ""}
               placeholder="India"
               onBlur={() => handleBlur("country")}
@@ -524,17 +465,12 @@ export default function BasicInfoForm({ profile, userId, onSaved }: Props) {
             <FieldError   message={err("country")} />
             <FieldWarning message={warn("country")} />
           </div>
-
-          {/* City */}
           <div>
             <label className="label-style" htmlFor="city">
-              City
-              <span className="text-forest/30 font-normal normal-case text-[10px] ml-1">(optional)</span>
+              City <span className="text-forest/30 font-normal normal-case text-[10px] ml-1">(optional)</span>
             </label>
             <input
-              id="city"
-              name="city"
-              className={cls("city")}
+              id="city" name="city" className={cls("city")}
               defaultValue={profile.city ?? ""}
               placeholder="Bangalore"
               onBlur={() => handleBlur("city")}
@@ -545,83 +481,167 @@ export default function BasicInfoForm({ profile, userId, onSaved }: Props) {
         </div>
       </fieldset>
 
-      {/* ── Section: Description ── */}
+      {/* ── About ── */}
       <fieldset className="space-y-3">
         <legend className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-forest/50 mb-1">
           <AlignLeft className="w-3.5 h-3.5" />
           About Your Company
         </legend>
-
-        {/* Writing guide */}
-        {/* <div className="bg-forest/[0.03] border border-forest/8 rounded-xl p-4 space-y-2">
-          <p className="text-xs font-semibold text-forest/60 uppercase tracking-wider">
-            What to include
-          </p>
-          <ul className="space-y-1.5">
-            {[
-              "What problem are you solving and for whom?",
-              "What is your core product or service?",
-              "What makes your approach unique?",
-              "Where are you in your journey?",
-            ].map((tip, i) => (
-              <li key={i} className="flex items-start gap-2 text-xs text-forest/50">
-                <span className="w-4 h-4 rounded-full bg-forest/10 text-forest/40 flex items-center justify-center text-[9px] font-bold flex-shrink-0 mt-[1px]">
-                  {i + 1}
-                </span>
-                {tip}
-              </li>
-            ))}
-          </ul>
-        </div> */}
-
-        {/* Textarea */}
         <div>
           <label className="label-style" htmlFor="description">
             Short Description
             <span className="text-forest/30 font-normal normal-case text-[10px] ml-1">(optional but recommended)</span>
           </label>
           <textarea
-            id="description"
-            name="description"
-            rows={5}
-            maxLength={DESCRIPTION_MAX}
+            id="description" name="description" rows={5} maxLength={DESCRIPTION_MAX}
             className={`${cls("description")} resize-none leading-relaxed`}
             defaultValue={profile.description ?? ""}
-            placeholder={`We're building a platform that… Our core users are… What sets us apart is…`}
+            placeholder="We're building a platform that… Our core users are… What sets us apart is…"
             onBlur={() => handleBlur("description")}
-            onChange={e => {
-              setDescLen(e.target.value.length);
-              if (touched.description) revalidate();
-            }}
+            onChange={e => { setDescLen(e.target.value.length); if (touched.description) revalidate(); }}
           />
           <CharBar current={descLen} max={DESCRIPTION_MAX} min={DESCRIPTION_MIN} />
           <FieldError   message={err("description")} />
           <FieldWarning message={warn("description")} />
           <FieldSuccess message={suc("description")} />
         </div>
-
-        {/* Quality indicator */}
         {descLen > 0 && (
           <div className="flex items-center gap-2 pt-1">
             <div className="flex gap-1">
-              {[50, 150, 300, 600].map(threshold => (
-                <div
-                  key={threshold}
-                  className={`h-1 w-8 rounded-full transition-colors duration-300 ${
-                    descLen >= threshold ? "bg-forest/60" : "bg-forest/10"
-                  }`}
-                />
+              {[50, 150, 300, 600].map(t => (
+                <div key={t} className={`h-1 w-8 rounded-full transition-colors duration-300 ${descLen >= t ? "bg-forest/60" : "bg-forest/10"}`} />
               ))}
             </div>
             <span className="text-[10px] text-forest/40">
-              {descLen < 50   ? "Too short"
-               : descLen < 150 ? "Minimal"
-               : descLen < 300 ? "Good"
-               : descLen < 600 ? "Strong"
-               : "Excellent"}
+              {descLen < 50 ? "Too short" : descLen < 150 ? "Minimal" : descLen < 300 ? "Good" : descLen < 600 ? "Strong" : "Excellent"}
             </span>
           </div>
         )}
+      </fieldset>
+
+      {/* ── Impact ── */}
+      <fieldset className="space-y-5">
+        <legend className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-forest/50 mb-4">
+          <Leaf className="w-3.5 h-3.5" />
+          Impact
+        </legend>
+
+        {/* Impact Description */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="label-style" htmlFor="impactDescription">
+              Environmental or Social Impact
+              <span className="text-forest/30 font-normal normal-case text-[10px] ml-1">(optional)</span>
+            </label>
+          </div>
+          <textarea
+            id="impactDescription" name="impactDescription" rows={4}
+            maxLength={IMPACT_DESC_MAX}
+            className={`${cls("impactDescription")} resize-none`}
+            defaultValue={profile.impactDescription ?? ""}
+            placeholder="Describe the positive ripple effects of your technology…"
+            onBlur={() => handleBlur("impactDescription")}
+            onChange={e => { setImpactDescLen(e.target.value.length); if (touched.impactDescription) revalidate(); }}
+          />
+          <CharBar current={impactDescLen} max={IMPACT_DESC_MAX} min={30} />
+          <FieldWarning message={warn("impactDescription")} />
+          <FieldSuccess message={suc("impactDescription")} />
+        </div>
+
+        {/* Impact Metrics */}
+        <div>
+          <label className="label-style" htmlFor="impactMetrics">
+            <span className="flex items-center gap-1.5">
+              <BarChart2 className="w-3 h-3" />
+              Target Metrics
+              <span className="text-forest/30 font-normal normal-case text-[10px]">(optional)</span>
+            </span>
+          </label>
+          <input
+            id="impactMetrics" name="impactMetrics"
+            maxLength={IMPACT_METRICS_MAX}
+            className={cls("impactMetrics")}
+            defaultValue={""}
+            placeholder="e.g. 50k tons of carbon sequestered annually by 2026"
+            onBlur={() => handleBlur("impactMetrics")}
+            onChange={e => { setImpactMetricsLen(e.target.value.length); if (touched.impactMetrics) revalidate(); }}
+          />
+          <CharBar current={impactMetricsLen} max={IMPACT_METRICS_MAX} />
+          <FieldError message={err("impactMetrics")} />
+        </div>
+      </fieldset>
+
+      {/* ── Capital ── */}
+      <fieldset className="space-y-5">
+        <legend className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-forest/50 mb-4">
+          <Wallet className="w-3.5 h-3.5" />
+          Capital Needs
+        </legend>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          {/* Capital Requested */}
+          <div>
+            <label className="label-style" htmlFor="capitalRequested">
+              <span className="flex items-center gap-1.5">
+                Capital Requested (USD)
+                <span className="text-forest/30 font-normal normal-case text-[10px]">(optional)</span>
+              </span>
+            </label>
+            <input
+              id="capitalRequested" name="capitalRequested"
+              maxLength={CAPITAL_MAX}
+              className={cls("capitalRequested")}
+              defaultValue={""}
+              placeholder="$500,000"
+              onBlur={() => handleBlur("capitalRequested")}
+              onChange={e => { setCapitalLen(e.target.value.length); if (touched.capitalRequested) revalidate(); }}
+            />
+            <FieldWarning message={warn("capitalRequested")} />
+            <FieldSuccess message={suc("capitalRequested")} />
+          </div>
+
+          {/* Funding Period */}
+          <div>
+            <label className="label-style" htmlFor="fundingPeriod">
+              <span className="flex items-center gap-1.5">
+                <Clock className="w-3 h-3" />
+                Planned Use Period
+                <span className="text-forest/30 font-normal normal-case text-[10px]">(optional)</span>
+              </span>
+            </label>
+            <input
+              id="fundingPeriod" name="fundingPeriod"
+              maxLength={FUNDING_PERIOD_MAX}
+              className={cls("fundingPeriod")}
+              defaultValue={""}
+              placeholder="18–24 months"
+              onBlur={() => handleBlur("fundingPeriod")}
+              onChange={e => { setFundingPeriodLen(e.target.value.length); if (touched.fundingPeriod) revalidate(); }}
+            />
+            <FieldWarning message={warn("fundingPeriod")} />
+            <FieldSuccess message={suc("fundingPeriod")} />
+          </div>
+        </div>
+
+        {/* Use of Funds */}
+        <div>
+          <label className="label-style" htmlFor="useOfFunds">
+            Use of Funds
+            <span className="text-forest/30 font-normal normal-case text-[10px] ml-1">(optional)</span>
+          </label>
+          <textarea
+            id="useOfFunds" name="useOfFunds" rows={3}
+            maxLength={USE_OF_FUNDS_MAX}
+            className={`${cls("useOfFunds")} resize-none`}
+            defaultValue={profile.useOfFunds ?? ""}
+            placeholder="R&D, expansion into NA market, core hiring…"
+            onBlur={() => handleBlur("useOfFunds")}
+            onChange={e => { setUseOfFundsLen(e.target.value.length); if (touched.useOfFunds) revalidate(); }}
+          />
+          <CharBar current={useOfFundsLen} max={USE_OF_FUNDS_MAX} />
+          <FieldWarning message={warn("useOfFunds")} />
+          <FieldSuccess message={suc("useOfFunds")} />
+        </div>
       </fieldset>
 
       {/* ── Server feedback ── */}
@@ -633,8 +653,7 @@ export default function BasicInfoForm({ profile, userId, onSaved }: Props) {
         }`}>
           {result.success
             ? <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            : <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-          }
+            : <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />}
           <p>{result.message}</p>
         </div>
       )}
@@ -642,8 +661,7 @@ export default function BasicInfoForm({ profile, userId, onSaved }: Props) {
       {/* ── Submit ── */}
       <div className="flex items-center gap-4 pt-2">
         <button
-          type="submit"
-          disabled={isPending}
+          type="submit" disabled={isPending}
           className="btn-primary bg-forest text-cream px-8 py-3 text-xs font-bold uppercase tracking-[0.2em] disabled:opacity-60 transition-all hover:bg-forest/90 rounded-lg"
         >
           {isPending ? (
@@ -656,7 +674,6 @@ export default function BasicInfoForm({ profile, userId, onSaved }: Props) {
             </span>
           ) : "Save Basic Info"}
         </button>
-
         {Object.keys(errors).length > 0 && (
           <p className="text-xs text-red-500 flex items-center gap-1.5">
             <AlertCircle className="w-3.5 h-3.5" />

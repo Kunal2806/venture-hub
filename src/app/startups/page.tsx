@@ -510,76 +510,72 @@ export default function ApplyPage() {
 
   // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    const step0Ok = validateStep(0);
-    const step1Ok = validateStep(1);
-    const step4Ok = validateStep(4);
+  const step0Ok = validateStep(0);
+  const step1Ok = validateStep(1);
+  const step4Ok = validateStep(4);
 
-    // Re-run all three so errors from the earliest failing step are shown
-    if (!step0Ok || !step1Ok || !step4Ok) {
-      setSubmitError("Some required fields are missing. Please review each step.");
-      return;
+  if (!step0Ok || !step1Ok || !step4Ok) {
+    setSubmitError("Some required fields are missing. Please review each step.");
+    return;
+  }
+
+  setIsSubmitting(true);
+  setSubmitError(null);
+
+  try {
+    localStorage.setItem("application-email", formData.email);
+
+    // Format phone with international prefix if valid
+    let formattedPhone: string | undefined;
+    if (formData.mobile.trim() && dialCountry) {
+      try {
+        const parsed = parsePhoneNumber(formData.mobile, dialCountry);
+        formattedPhone = parsed.formatInternational();
+      } catch {
+        formattedPhone = formData.mobile;
+      }
     }
 
-    setIsSubmitting(true);
-    setSubmitError(null);
+    const response = await fetch("/api/apply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        founderName:       formData.founderName,
+        email:             formData.email,
+        mobile:            formattedPhone,
+        companyName:       formData.companyName,
+        sector:            formData.sector,
+        stage:             stageMapping[formData.stage as keyof typeof stageMapping],
+        country:           formData.country   || undefined,
+        websiteUrl:        formData.websiteUrl || undefined,
+        pitchDeckUrl:      formData.pitchDeckUrl || undefined,
+        // ── Separated fields — no more join("\n") ──
+        impactDescription: formData.impactDescription || undefined,
+        impactMetrics:     formData.impactMetrics     || undefined,
+        useOfFunds:        formData.useOfFunds        || undefined,
+        fundingPeriod:     formData.fundingPeriod     || undefined,
+        capitalRequested:  formData.capitalRequested  || undefined,
+      }),
+    });
 
-    try {
-      localStorage.setItem("application-email", formData.email);
+    const data = await response.json();
 
-      const fullDescription = [
-        `Impact: ${formData.impactDescription  || "—"}`,
-        `Metrics: ${formData.impactMetrics     || "—"}`,
-        `Use of Funds: ${formData.useOfFunds   || "—"}`,
-        `Period: ${formData.fundingPeriod      || "—"}`,
-        `Capital: ${formData.capitalRequested  || "—"}`,
-      ].join("\n");
-
-      // Format phone with international prefix if valid
-      let formattedPhone: string | undefined;
-      if (formData.mobile.trim() && dialCountry) {
-        try {
-          const parsed = parsePhoneNumber(formData.mobile, dialCountry);
-          formattedPhone = parsed.formatInternational();
-        } catch {
-          formattedPhone = formData.mobile;
-        }
-      }
-
-      const response = await fetch("/api/apply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          founderName:  formData.founderName,
-          email:        formData.email,
-          mobile:       formattedPhone,
-          companyName:  formData.companyName,
-          sector:       formData.sector,
-          stage:        stageMapping[formData.stage as keyof typeof stageMapping],
-          country:      formData.country || undefined,
-          websiteUrl:   formData.websiteUrl || undefined,
-          description:  fullDescription,
-          pitchDeckUrl: formData.pitchDeckUrl || undefined,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (response.status === 409)
-          throw new Error("An application with this email already exists. Check your inbox.");
-        if (response.status === 400 && data.details)
-          throw new Error(data.details.map((d: { message: string }) => d.message).join(". "));
-        throw new Error(data.error || "Something went wrong. Please try again.");
-      }
-
-      localStorage.removeItem("venturehub-application-draft");
-      setShowSuccess(true);
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setIsSubmitting(false);
+    if (!response.ok) {
+      if (response.status === 409)
+        throw new Error("An application with this email already exists. Check your inbox.");
+      if (response.status === 400 && data.details)
+        throw new Error(data.details.map((d: { message: string }) => d.message).join(". "));
+      throw new Error(data.error || "Something went wrong. Please try again.");
     }
-  };
+
+    localStorage.removeItem("venturehub-application-draft");
+    setShowSuccess(true);
+  } catch (err) {
+    setSubmitError(err instanceof Error ? err.message : "Something went wrong");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const progressValue = Math.round(((currentStep + 1) / steps.length) * 100);
 

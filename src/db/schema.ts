@@ -143,24 +143,27 @@ export const StartupApplicationsTable = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey().notNull(),
 
-    // Contact info (no account yet)
-    founderName: text("founder_name").notNull(),
-    email: text("email").notNull(),
-    mobile: text("mobile"),
-    companyName: text("company_name").notNull(),
-    websiteUrl: text("website_url"),
-    sector: text("sector").notNull(),
-    stage: FundingStage("stage").notNull(),
-    country: text("country"),
-    description: text("description"),
+    founderName:  text("founder_name").notNull(),
+    email:        text("email").notNull(),
+    mobile:       text("mobile"),
+    companyName:  text("company_name").notNull(),
+    websiteUrl:   text("website_url"),
+    sector:       text("sector").notNull(),
+    stage:        FundingStage("stage").notNull(),
+    country:      text("country"),
     pitchDeckUrl: text("pitch_deck_url"),
 
-    status: ApplicationStatus("status").default("SUBMITTED").notNull(),
-    reviewedBy: uuid("reviewed_by"), // FK to users set after user exists
-    reviewNotes: text("review_notes"),
-    reviewedAt: timestamp("reviewed_at", { mode: "date" }),
+    // ── Formerly concatenated into `description` ──
+    impactDescription: text("impact_description"),
+    impactMetrics:     text("impact_metrics"),
+    useOfFunds:        text("use_of_funds"),
+    fundingPeriod:     text("funding_period"),
+    capitalRequested:  text("capital_requested"),
 
-    // Set when admin approves — links application to created user
+    status:        ApplicationStatus("status").default("SUBMITTED").notNull(),
+    reviewedBy:    uuid("reviewed_by"),
+    reviewNotes:   text("review_notes"),
+    reviewedAt:    timestamp("reviewed_at", { mode: "date" }),
     createdUserId: uuid("created_user_id"),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -168,11 +171,7 @@ export const StartupApplicationsTable = pgTable(
   },
   (t) => [
     uniqueIndex("startup_applications_email_key").on(t.email),
-    // Admin review queue
-    index("startup_applications_status_created_at_idx").on(
-      t.status,
-      t.createdAt
-    ),
+    index("startup_applications_status_created_at_idx").on(t.status, t.createdAt),
   ]
 );
 
