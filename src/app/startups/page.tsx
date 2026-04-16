@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   Save, CheckCircle, Loader2, AlertCircle, ChevronLeft,
   ChevronRight, X, Phone,
@@ -214,10 +215,9 @@ function FieldSuccess({ message }: { message?: string }) {
 
 export default function ApplyPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [currentStep, setCurrentStep]   = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showSuccess, setShowSuccess]   = useState(false);
-  const [successCountdown, setSuccessCountdown] = useState(5);
   const [submitError, setSubmitError]   = useState<string | null>(null);
   const [validationErrors,   setValidationErrors]   = useState<Record<string, string>>({});
   const [validationWarnings, setValidationWarnings] = useState<Record<string, string>>({});
@@ -276,19 +276,6 @@ export default function ApplyPage() {
     document.body.style.overflow = showMobileMenu ? "hidden" : "unset";
     return () => { document.body.style.overflow = "unset"; };
   }, [showMobileMenu]);
-
-  // ── Success auto-close ─────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!showSuccess) return;
-    setSuccessCountdown(5);
-    const interval = setInterval(() => {
-      setSuccessCountdown(prev => {
-        if (prev <= 1) { clearInterval(interval); setShowSuccess(false); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [showSuccess]);
 
   // ── Input change handler ───────────────────────────────────────────────────
   const handleInputChange = (
@@ -569,7 +556,7 @@ export default function ApplyPage() {
     }
 
     localStorage.removeItem("venturehub-application-draft");
-    setShowSuccess(true);
+    router.push("/startups/success");
   } catch (err) {
     setSubmitError(err instanceof Error ? err.message : "Something went wrong");
   } finally {
@@ -1288,36 +1275,6 @@ export default function ApplyPage() {
       <div className="hidden lg:block">
         <Footer />
       </div>
-
-      {/* ── Success overlay ── */}
-      {showSuccess && (
-        <div className="fixed inset-0 bg-forest/95 z-[100] flex items-center justify-center text-center px-6 animate-fade-in">
-          {/* Close button */}
-          <button
-            onClick={() => setShowSuccess(false)}
-            className="absolute top-5 right-5 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
-            aria-label="Close"
-          >
-            <X className="w-4 h-4 text-white" />
-          </button>
-
-          <div className="max-w-md">
-            <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center text-white mb-6 mx-auto animate-scale-in">
-              <CheckCircle className="w-8 h-8" />
-            </div>
-            <h2 className="font-serif text-3xl lg:text-4xl text-white mb-4 animate-slide-up">
-              Application Planted.
-            </h2>
-            <p className="text-white/60 text-base leading-relaxed animate-slide-up animation-delay-150">
-              Your vision is now in our ecosystem. Check your email for
-              confirmation and next steps.
-            </p>
-            <p className="mt-6 text-white/30 text-xs tracking-widest uppercase animate-slide-up animation-delay-150">
-              Closing in {successCountdown}s
-            </p>
-          </div>
-        </div>
-      )}
 
       <style jsx>{`
         @keyframes fade-in    { from { opacity: 0 }                         to { opacity: 1 } }

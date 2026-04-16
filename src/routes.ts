@@ -11,7 +11,9 @@ export const publicRoutes: string[] = [
   "/",
   "/auth/verify-email",
   "/investors",
+  "/investors/success",
   "/startups",
+  "/startups/success",
   "/cohort",
   "/mentorship",
   "/profile",
@@ -19,7 +21,10 @@ export const publicRoutes: string[] = [
 ];
 
 // APIs which are accessible to all.
-export const publicApis: string[] = ["/api/apply"];
+export const publicApis: string[] = [
+  "/api/apply",
+  "/api/investors/apply",
+];
 
 // Routes which are used for authentication.
 // NOTE: /auth/change-password is intentionally NOT in authRoutes.

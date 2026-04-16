@@ -395,10 +395,74 @@ export const StartupDocumentsTable = pgTable(
 );
 
 // =====================================================================
+// ADD TO schema.ts — after StartupApplicationsTable
+// =====================================================================
+
+export const InvestorApplicationsTable = pgTable(
+  "investor_applications",
+  {
+    id: uuid("id").defaultRandom().primaryKey().notNull(),
+
+    // Identity
+    name:        text("name").notNull(),
+    email:       text("email").notNull(),
+    mobile:      text("mobile"),
+
+    // Firm
+    firmName:    text("firm_name"),
+    designation: text("designation"),
+    investorType: InvestorType("investor_type"),
+    bio:         text("bio"),
+    websiteUrl:  text("website_url"),
+    linkedinUrl: text("linkedin_url"),
+    country:     text("country"),
+    city:        text("city"),
+
+    // Investment preferences
+    preferredSectors:     jsonb("preferred_sectors").default([]).notNull(),
+    preferredStages:      jsonb("preferred_stages").default([]).notNull(),
+    preferredGeographies: jsonb("preferred_geographies").default([]).notNull(),
+    impactFocused:        boolean("impact_focused").default(false).notNull(),
+    investmentThesis:     text("investment_thesis"),
+
+    // Ticket size
+    ticketSizeMin: decimal("ticket_size_min", { precision: 15, scale: 2 }),
+    ticketSizeMax: decimal("ticket_size_max", { precision: 15, scale: 2 }),
+
+    // Admin review lifecycle — identical to startup_applications
+    status:        ApplicationStatus("status").default("SUBMITTED").notNull(),
+    reviewedBy:    uuid("reviewed_by"),
+    reviewNotes:   text("review_notes"),
+    reviewedAt:    timestamp("reviewed_at", { mode: "date" }),
+    createdUserId: uuid("created_user_id"), // set after admin approves & creates user
+
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("investor_applications_email_key").on(t.email),
+    index("investor_applications_status_created_at_idx").on(t.status, t.createdAt),
+  ]
+);
+
+// ── Drizzle relation (add to existing relations block) ──────────────
+export const investorApplicationsRelations = relations(
+  InvestorApplicationsTable,
+  ({ many }) => ({
+    payments: many(PaymentsTable),
+  })
+);
+
+// ── TypeScript types ─────────────────────────────────────────────────
+export type InvestorApplication = typeof InvestorApplicationsTable.$inferSelect;
+export type NewInvestorApplication = typeof InvestorApplicationsTable.$inferInsert;
+
+// =====================================================================
 // INVESTOR PROFILE
 // preferredSectors / preferredStages / preferredGeographies → jsonb[]
 // Enables GIN index for @> containment used by matching algorithm.
 // =====================================================================
+
 
 export const InvestorProfilesTable = pgTable(
   "investor_profiles",
