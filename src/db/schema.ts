@@ -535,6 +535,36 @@ export const InvestorProfilesTable = pgTable(
   ]
 );
 
+export const MentorApplicationsTable = pgTable(
+  "mentor_applications",
+  {
+    id: uuid("id").defaultRandom().primaryKey().notNull(),
+    fullName:          text("full_name").notNull(),
+    email:             text("email").notNull(),
+    mobile:            text("mobile"),
+    linkedinUrl:       text("linkedin_url"),
+    currentRole:       text("current_role").notNull(),
+    company:           text("company").notNull(),
+    yearsOfExperience: integer("years_of_experience").notNull(),
+    domains:           jsonb("domains").default([]).notNull(),
+    bio:               text("bio"),
+    status:            ApplicationStatus("status").default("SUBMITTED").notNull(),
+    reviewNotes:       text("review_notes"),
+    reviewedBy:        uuid("reviewed_by"),
+    reviewedAt:        timestamp("reviewed_at", { mode: "date" }),
+    createdUserId:     uuid("created_user_id"),
+    createdAt:         timestamp("created_at").defaultNow().notNull(),
+    updatedAt:         timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("mentor_applications_email_key").on(t.email),
+    index("mentor_applications_status_created_at_idx").on(t.status, t.createdAt),
+  ]
+);
+
+export type MentorApplication = typeof MentorApplicationsTable.$inferSelect;
+export type NewMentorApplication = typeof MentorApplicationsTable.$inferInsert;
+
 // =====================================================================
 // MENTOR PROFILE
 // domains / industries → jsonb arrays (same GIN rationale as investor)
