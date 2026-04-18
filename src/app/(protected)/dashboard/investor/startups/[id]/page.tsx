@@ -32,10 +32,12 @@ function StatBlock({ label, value }: { label: string; value: string | number | n
 }
 
 interface PageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export default async function StartupDetailPage({ params }: PageProps) {
+  const { id } = await params
+
   // ── 1. Auth guard ──────────────────────────────────────────────────
   const session = await auth()
   if (!session?.user) redirect("/auth/sign-in")
@@ -46,7 +48,7 @@ export default async function StartupDetailPage({ params }: PageProps) {
 
   // ── 2. Fetch startup ───────────────────────────────────────────────
   const startup = await db.query.StartupProfilesTable.findFirst({
-    where: eq(StartupProfilesTable.id, params.id),
+    where: eq(StartupProfilesTable.id, id),
   })
 
   if (!startup || startup.approvalStatus !== "APPROVED") {
