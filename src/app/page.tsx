@@ -11,7 +11,7 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen bg-[#F9F7F2]">
-      <Navigation activeItem="home" isLoggedIn={!!session?.user} />
+      <Navigation activeItem="home" />
       <main className="pt-16 sm:pt-20">
         <HeroSection />
         <MissionSection />

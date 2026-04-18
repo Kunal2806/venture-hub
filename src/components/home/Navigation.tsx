@@ -2,11 +2,17 @@
 
 import Link from "next/link";
 import { Leaf, Home, Sprout, Landmark, Users, User, LayoutDashboard } from "lucide-react";
+import { useSession } from "next-auth/react";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface NavigationProps {
   activeItem?: "home" | "startups" | "investors" | "mentorship" | "mission" | "cohort" | "profile";
-  isLoggedIn?: boolean;
+  // NOTE: `isLoggedIn` prop has been removed.
+  // Auth is resolved internally via useSession — pages no longer need to pass it.
 }
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const topNavLinks = [
   { key: "startups",   label: "Startups",   href: "/startups" },
@@ -23,7 +29,22 @@ const bottomTabs = [
   { key: "profile",    label: "Profile",   href: "/profile",    Icon: User },
 ];
 
-export function Navigation({ activeItem = "home", isLoggedIn = false }: NavigationProps) {
+// ─── Component ────────────────────────────────────────────────────────────────
+
+/**
+ * Navigation is the single source of auth truth across the app.
+ *
+ * Before:  <Navigation activeItem="home" isLoggedIn={!!session?.user} />
+ * After:   <Navigation activeItem="home" />
+ *
+ * Pages no longer import useSession or pass isLoggedIn — this component
+ * handles the session check internally so that logic lives in exactly one place.
+ */
+export function Navigation({ activeItem = "home" }: NavigationProps) {
+  // Auth resolved here — not on the page
+  const { data: session, status } = useSession();
+  const isLoggedIn = status === "authenticated" && !!session?.user;
+
   return (
     <>
       {/* ── Top Navbar ── */}
@@ -53,7 +74,7 @@ export function Navigation({ activeItem = "home", isLoggedIn = false }: Navigati
             ))}
           </div>
 
-          {/* Desktop Actions */}
+          {/* Desktop Actions — Dashboard if logged in, Log In + Join if guest */}
           <div className="hidden lg:flex items-center gap-6 flex-shrink-0">
             {isLoggedIn ? (
               <Link
@@ -86,7 +107,7 @@ export function Navigation({ activeItem = "home", isLoggedIn = false }: Navigati
       {/* ── Mobile Bottom Bar ── */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-forest/10">
 
-        {/* Mobile auth / dashboard strip */}
+        {/* Mobile auth strip */}
         {isLoggedIn ? (
           <div className="px-4 py-2 border-b border-forest/10">
             <Link
