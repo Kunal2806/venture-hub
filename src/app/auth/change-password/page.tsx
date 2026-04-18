@@ -45,7 +45,6 @@ const requirements = [
 ];
 
 export default function ChangePasswordPage() {
-  const router = useRouter();
   const [showCurrent, setShowCurrent]   = useState(false);
   const [showNew, setShowNew]           = useState(false);
   const [showConfirm, setShowConfirm]   = useState(false);
@@ -71,7 +70,7 @@ export default function ChangePasswordPage() {
       }
       setSuccess(result.success);
       // Give user a moment to read success, then redirect
-      setTimeout(() => router.push("/dashboard"), 1500);
+      setTimeout(() => { window.location.href = "/dashboard/startup"; }, 1500);
     });
   }
 

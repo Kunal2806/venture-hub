@@ -135,7 +135,7 @@ export default function InvestorDashboardPage() {
       {/* Quick Actions */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Discover Startups", icon: <Eye className="h-4 w-4" />, href: "/dashboard/investor/discover" },
+          { label: "Discover Startups", icon: <Eye className="h-4 w-4" />, href: "/dashboard/investor/startups" },
           { label: "My Watchlist", icon: <Star className="h-4 w-4" />, href: "/dashboard/investor/watchlist" },
           { label: "Full Pipeline", icon: <BarChart3 className="h-4 w-4" />, href: "/dashboard/investor/pipeline" },
           { label: "Messages", icon: <MessageSquare className="h-4 w-4" />, href: "/dashboard/investor/messages" },

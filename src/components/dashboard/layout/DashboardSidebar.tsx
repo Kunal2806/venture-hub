@@ -82,7 +82,7 @@ const NAV_ITEMS: NavItem[] = [
 
   // ── Investor ──────────────────────────────────────────────────────────────
   {
-    href: "/dashboard/investor/discover",
+    href: "/dashboard/investor/startups",
     label: "Discover Startups",
     icon: <Briefcase className="h-4 w-4" />,
     roles: ["INVESTOR"],

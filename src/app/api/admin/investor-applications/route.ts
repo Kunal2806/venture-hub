@@ -1,11 +1,11 @@
-// app/api/admin/startup-applications/route.ts
+// app/api/admin/investor-applications/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import {
-  StartupApplicationsTable,
+  InvestorApplicationsTable,
   UsersTable,
-  StartupProfilesTable,
+  InvestorProfilesTable,
 } from "@/db/schema";
 import { eq, desc, and, ilike, or, count } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -36,20 +36,11 @@ function generateTempPassword(): string {
 
 function buildCredentialsEmail(
   name: string,
-  role: string,
   email: string,
   tempPassword: string,
   loginUrl: string,
   reviewNotes?: string
 ) {
-  const roleLabels: Record<string, string> = {
-    STARTUP:  "Startup Founder",
-    INVESTOR: "Investor",
-    MENTOR:   "Mentor",
-    ADMIN:    "Admin",
-  };
-  const roleLabel = roleLabels[role] ?? role;
-
   return `
     <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;
                 background:#F9F7F2;border-radius:16px;overflow:hidden;">
@@ -58,9 +49,9 @@ function buildCredentialsEmail(
         <p style="margin:6px 0 0;font-size:13px;color:rgba(249,247,242,0.55);">Startup Ecosystem Platform</p>
       </div>
       <div style="padding:36px;">
-        <p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#1A362B;">You're approved, ${name}! 🎉</p>
+        <p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#1A362B;">Welcome aboard, ${name}! 🎉</p>
         <p style="margin:0 0 24px;font-size:15px;color:#4A5D4E;line-height:1.65;">
-          Your <strong>${roleLabel}</strong> account on VentureHub has been approved.
+          Your <strong>Investor</strong> account on VentureHub has been approved.
           Use the credentials below to log in — you'll be prompted to set a new password on your first login.
         </p>
         ${reviewNotes ? `
@@ -79,12 +70,15 @@ function buildCredentialsEmail(
             <tr>
               <td style="padding:8px 0;font-size:13px;color:#4A5D4E;">Temporary Password</td>
               <td style="padding:8px 0;">
-                <code style="background:#F9F7F2;color:#1A362B;font-size:15px;font-weight:700;padding:4px 10px;border-radius:6px;letter-spacing:0.05em;font-family:monospace;">${tempPassword}</code>
+                <code style="background:#F9F7F2;color:#1A362B;font-size:15px;font-weight:700;
+                              padding:4px 10px;border-radius:6px;letter-spacing:0.05em;font-family:monospace;">${tempPassword}</code>
               </td>
             </tr>
           </table>
         </div>
-        <a href="${loginUrl}" style="display:inline-block;background:#1A362B;color:#F9F7F2;text-decoration:none;padding:14px 28px;border-radius:10px;font-size:14px;font-weight:700;letter-spacing:0.02em;">
+        <a href="${loginUrl}"
+           style="display:inline-block;background:#1A362B;color:#F9F7F2;text-decoration:none;
+                  padding:14px 28px;border-radius:10px;font-size:14px;font-weight:700;letter-spacing:0.02em;">
           Log In to VentureHub →
         </a>
         <div style="background:#fef3c7;border-radius:10px;padding:14px 18px;margin-top:24px;border-left:3px solid #f59e0b;">
@@ -95,29 +89,32 @@ function buildCredentialsEmail(
           </p>
         </div>
         <p style="margin:20px 0 0;font-size:12px;color:#4A5D4E;line-height:1.5;">
-          Questions? Reach us at <a href="mailto:support@venturehub.io" style="color:#1A362B;font-weight:600;">support@venturehub.io</a>
+          Questions? Reach us at
+          <a href="mailto:support@venturehub.io" style="color:#1A362B;font-weight:600;">support@venturehub.io</a>
         </p>
       </div>
       <div style="padding:20px 36px;border-top:1px solid #EFEBE3;">
         <p style="margin:0;font-size:11px;color:#9ca3af;">
-          © ${new Date().getFullYear()} VentureHub · venturehub.io · You received this because your account was approved by an admin.
+          © ${new Date().getFullYear()} VentureHub · venturehub.io ·
+          You received this because your investor account was approved by an admin.
         </p>
       </div>
     </div>
   `;
 }
 
-function buildRejectionEmail(founderName: string, companyName: string, reviewNotes?: string) {
+function buildRejectionEmail(name: string, reviewNotes?: string) {
   return `
-    <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;background:#F9F7F2;border-radius:16px;overflow:hidden;">
+    <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;
+                background:#F9F7F2;border-radius:16px;overflow:hidden;">
       <div style="background:#1A362B;padding:32px 36px;">
         <h1 style="margin:0;font-size:22px;color:#F9F7F2;font-weight:700;">VentureHub</h1>
         <p style="margin:6px 0 0;font-size:13px;color:rgba(249,247,242,0.55);">Startup Ecosystem Platform</p>
       </div>
       <div style="padding:36px;">
-        <p style="margin:0 0 8px;font-size:20px;font-weight:700;color:#1A362B;">Update on your application</p>
+        <p style="margin:0 0 8px;font-size:20px;font-weight:700;color:#1A362B;">Update on your investor application</p>
         <p style="margin:0 0 20px;font-size:15px;color:#4A5D4E;line-height:1.65;">
-          Hi ${founderName}, thank you for applying to VentureHub with <strong style="color:#2D2D2D;">${companyName}</strong>.
+          Hi ${name}, thank you for applying to join VentureHub as an investor.
           After careful review, we're unable to approve your application at this time.
         </p>
         ${reviewNotes ? `
@@ -126,7 +123,9 @@ function buildRejectionEmail(founderName: string, companyName: string, reviewNot
           <p style="margin:0;font-size:14px;color:#2D2D2D;line-height:1.5;">${reviewNotes}</p>
         </div>
         ` : ""}
-        <p style="margin:0;font-size:14px;color:#4A5D4E;line-height:1.6;">You're welcome to reapply in the future. If you have questions, reply to this email.</p>
+        <p style="margin:0;font-size:14px;color:#4A5D4E;line-height:1.6;">
+          You're welcome to reapply in the future. If you have questions, reply to this email.
+        </p>
       </div>
       <div style="padding:20px 36px;border-top:1px solid #EFEBE3;">
         <p style="margin:0;font-size:11px;color:#9ca3af;">© ${new Date().getFullYear()} VentureHub · venturehub.io</p>
@@ -135,9 +134,10 @@ function buildRejectionEmail(founderName: string, companyName: string, reviewNot
   `;
 }
 
-function buildUnderReviewEmail(founderName: string, companyName: string) {
+function buildUnderReviewEmail(name: string) {
   return `
-    <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;background:#F9F7F2;border-radius:16px;overflow:hidden;">
+    <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;
+                background:#F9F7F2;border-radius:16px;overflow:hidden;">
       <div style="background:#1A362B;padding:32px 36px;">
         <h1 style="margin:0;font-size:22px;color:#F9F7F2;font-weight:700;">VentureHub</h1>
         <p style="margin:6px 0 0;font-size:13px;color:rgba(249,247,242,0.55);">Startup Ecosystem Platform</p>
@@ -145,7 +145,7 @@ function buildUnderReviewEmail(founderName: string, companyName: string) {
       <div style="padding:36px;">
         <p style="margin:0 0 8px;font-size:20px;font-weight:700;color:#1A362B;">Your application is under review</p>
         <p style="margin:0 0 20px;font-size:15px;color:#4A5D4E;line-height:1.65;">
-          Hi ${founderName}, our team has started reviewing the application for <strong style="color:#2D2D2D;">${companyName}</strong>.
+          Hi ${name}, our team has started reviewing your investor application.
           We'll send you an email with our decision within 3–5 business days.
         </p>
         <p style="margin:0;font-size:14px;color:#4A5D4E;line-height:1.6;">No action needed from you right now. Thank you for your patience!</p>
@@ -157,7 +157,7 @@ function buildUnderReviewEmail(founderName: string, companyName: string) {
   `;
 }
 
-// ── GET /api/admin/startup-applications ───────────────────────────────────
+// ── GET /api/admin/investor-applications ──────────────────────────────────
 export async function GET(req: NextRequest) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -172,26 +172,34 @@ export async function GET(req: NextRequest) {
   const conditions = [];
   if (status && ["SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED"].includes(status)) {
     conditions.push(
-      eq(StartupApplicationsTable.status, status as "SUBMITTED" | "UNDER_REVIEW" | "APPROVED" | "REJECTED")
+      eq(
+        InvestorApplicationsTable.status,
+        status as "SUBMITTED" | "UNDER_REVIEW" | "APPROVED" | "REJECTED"
+      )
     );
   }
   if (search) {
     conditions.push(
       or(
-        ilike(StartupApplicationsTable.founderName, `%${search}%`),
-        ilike(StartupApplicationsTable.companyName, `%${search}%`),
-        ilike(StartupApplicationsTable.email, `%${search}%`)
+        ilike(InvestorApplicationsTable.name,     `%${search}%`),
+        ilike(InvestorApplicationsTable.email,    `%${search}%`),
+        ilike(InvestorApplicationsTable.firmName, `%${search}%`)
       )
     );
   }
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
   const [applications, [{ total }]] = await Promise.all([
-    db.select().from(StartupApplicationsTable)
+    db.select()
+      .from(InvestorApplicationsTable)
       .where(whereClause)
-      .orderBy(desc(StartupApplicationsTable.createdAt))
-      .limit(limit).offset(offset),
-    db.select({ total: count() }).from(StartupApplicationsTable).where(whereClause),
+      .orderBy(desc(InvestorApplicationsTable.createdAt))
+      .limit(limit)
+      .offset(offset),
+    db.select({ total: count() })
+      .from(InvestorApplicationsTable)
+      .where(whereClause),
   ]);
 
   return NextResponse.json({
@@ -200,7 +208,7 @@ export async function GET(req: NextRequest) {
   });
 }
 
-// ── PATCH /api/admin/startup-applications ─────────────────────────────────
+// ── PATCH /api/admin/investor-applications ────────────────────────────────
 export async function PATCH(req: NextRequest) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -217,14 +225,14 @@ export async function PATCH(req: NextRequest) {
   }
 
   const [application] = await db
-    .select().from(StartupApplicationsTable)
-    .where(eq(StartupApplicationsTable.id, id))
+    .select()
+    .from(InvestorApplicationsTable)
+    .where(eq(InvestorApplicationsTable.id, id))
     .limit(1);
 
   if (!application) {
     return NextResponse.json({ error: "Application not found" }, { status: 404 });
   }
-
   if (application.status === "APPROVED") {
     return NextResponse.json({ error: "Application already approved" }, { status: 409 });
   }
@@ -236,40 +244,40 @@ export async function PATCH(req: NextRequest) {
 
   // ── UNDER REVIEW ──────────────────────────────────────────────────────
   if (action === "under_review") {
-    await db.update(StartupApplicationsTable).set({
-      status: "UNDER_REVIEW",
-      reviewedBy: admin.id,
+    await db.update(InvestorApplicationsTable).set({
+      status:      "UNDER_REVIEW",
+      reviewedBy:  admin.id,
       reviewNotes: reviewNotes || null,
-      reviewedAt: now,
-      updatedAt: now,
-    }).where(eq(StartupApplicationsTable.id, id));
+      reviewedAt:  now,
+      updatedAt:   now,
+    }).where(eq(InvestorApplicationsTable.id, id));
 
     sendEmail(
       "VentureHub",
       application.email,
-      `Your VentureHub application is under review — ${application.companyName}`,
-      buildUnderReviewEmail(application.founderName, application.companyName)
-    ).catch((err) => console.error("[mailer] under_review email failed:", err));
+      "Your VentureHub investor application is under review",
+      buildUnderReviewEmail(application.name)
+    ).catch((err) => console.error("[mailer] investor under_review email failed:", err));
 
     return NextResponse.json({ success: true, status: "UNDER_REVIEW" });
   }
 
   // ── REJECT ────────────────────────────────────────────────────────────
   if (action === "reject") {
-    await db.update(StartupApplicationsTable).set({
-      status: "REJECTED",
-      reviewedBy: admin.id,
+    await db.update(InvestorApplicationsTable).set({
+      status:      "REJECTED",
+      reviewedBy:  admin.id,
       reviewNotes: reviewNotes || null,
-      reviewedAt: now,
-      updatedAt: now,
-    }).where(eq(StartupApplicationsTable.id, id));
+      reviewedAt:  now,
+      updatedAt:   now,
+    }).where(eq(InvestorApplicationsTable.id, id));
 
     sendEmail(
       "VentureHub",
       application.email,
-      `Update on your VentureHub application — ${application.companyName}`,
-      buildRejectionEmail(application.founderName, application.companyName, reviewNotes)
-    ).catch((err) => console.error("[mailer] rejection email failed:", err));
+      "Update on your VentureHub investor application",
+      buildRejectionEmail(application.name, reviewNotes)
+    ).catch((err) => console.error("[mailer] investor rejection email failed:", err));
 
     return NextResponse.json({ success: true, status: "REJECTED" });
   }
@@ -295,14 +303,14 @@ export async function PATCH(req: NextRequest) {
 
     try {
       await db.transaction(async (tx) => {
-        // 1. Create user
+        // 1. Create user account
         await tx.insert(UsersTable).values({
           id:                 newUserId,
-          name:               application.founderName,
+          name:               application.name,
           email:              application.email,
           password:           hashedTempPassword,
-          mobile:             application.mobile || null,
-          role:               "STARTUP",
+          mobile:             application.mobile       || null,
+          role:               "INVESTOR",
           isActive:           true,
           emailVerified:      now,
           mustChangePassword: true,
@@ -310,55 +318,58 @@ export async function PATCH(req: NextRequest) {
           updatedAt:          now,
         });
 
-        // 2. Create startup profile — map flat application columns to profile columns
-        await tx.insert(StartupProfilesTable).values({
-          userId:              newUserId,
-          companyName:         application.companyName,
-          websiteUrl:          application.websiteUrl          || null,
-          sector:              application.sector,
-          stage:               application.stage,
-          country:             application.country             || null,
-          // Map flat application fields → startup profile fields
-          impactDescription:   application.impactDescription   || null,
-          useOfFunds:          application.useOfFunds          || null,
-          // capitalRequested and fundingPeriod have no direct profile columns;
-          // store capital as fundingAskMin for reference (cast to string for decimal)
-          fundingAskMin:       application.capitalRequested    || null,
-          approvalStatus:      "APPROVED",
-          profileScore:        10,
-          founders:            [],
-          sdgGoals:            [],
-          createdAt:           now,
-          updatedAt:           now,
+        // 2. Create investor profile — copy all preference fields from application
+        await tx.insert(InvestorProfilesTable).values({
+          userId:               newUserId,
+          firmName:             application.firmName             || null,
+          designation:          application.designation          || null,
+          investorType:         application.investorType         || null,
+          bio:                  application.bio                  || null,
+          websiteUrl:           application.websiteUrl           || null,
+          linkedinUrl:          application.linkedinUrl          || null,
+          country:              application.country              || null,
+          city:                 application.city                 || null,
+          preferredSectors:     application.preferredSectors,
+          preferredStages:      application.preferredStages,
+          preferredGeographies: application.preferredGeographies,
+          ticketSizeMin:        application.ticketSizeMin        || null,
+          ticketSizeMax:        application.ticketSizeMax        || null,
+          investmentThesis:     application.investmentThesis     || null,
+          impactFocused:        application.impactFocused,
+          approvalStatus:       "APPROVED",
+          isVerified:           false,
+          totalInvestments:     0,
+          createdAt:            now,
+          updatedAt:            now,
         });
 
-        // 3. Mark application as approved
-        await tx.update(StartupApplicationsTable).set({
+        // 3. Mark application approved and link to the new user
+        await tx.update(InvestorApplicationsTable).set({
           status:        "APPROVED",
           reviewedBy:    admin.id,
           reviewNotes:   reviewNotes || null,
           reviewedAt:    now,
           createdUserId: newUserId,
           updatedAt:     now,
-        }).where(eq(StartupApplicationsTable.id, id));
+        }).where(eq(InvestorApplicationsTable.id, id));
       });
     } catch (err) {
-      console.error("[approve] transaction failed:", err);
+      console.error("[approve investor] transaction failed:", err);
       return NextResponse.json(
-        { error: "Failed to create account. Please try again." },
+        { error: "Failed to create investor account. Please try again." },
         { status: 500 }
       );
     }
 
+    // 4. Send credentials email after transaction commits
     const loginUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/login`;
     try {
       await sendEmail(
         "VentureHub",
         application.email,
-        "You're approved! Here are your VentureHub login credentials",
+        "You're approved! Here are your VentureHub investor credentials",
         buildCredentialsEmail(
-          application.founderName,
-          "STARTUP",
+          application.name,
           application.email,
           tempPassword,
           loginUrl,
@@ -366,7 +377,7 @@ export async function PATCH(req: NextRequest) {
         )
       );
     } catch (err) {
-      console.error("[approve] credentials email failed:", err);
+      console.error("[approve investor] credentials email failed:", err);
       return NextResponse.json({
         success: true,
         status: "APPROVED",
