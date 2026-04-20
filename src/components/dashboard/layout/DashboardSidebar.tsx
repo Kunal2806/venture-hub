@@ -81,6 +81,13 @@ const NAV_ITEMS: NavItem[] = [
   },
 
   // ── Investor ──────────────────────────────────────────────────────────────
+   {
+    href: "/dashboard/investor/profile",
+    label: "My Profile",
+    icon: <Rocket className="h-4 w-4" />,
+    roles: ["INVESTOR"],
+    group: "investor",
+  },
   {
     href: "/dashboard/investor/startups",
     label: "Discover Startups",

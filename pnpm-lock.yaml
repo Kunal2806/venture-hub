@@ -44,12 +44,21 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      country-flag-emoji-json:
+        specifier: ^2.0.0
+        version: 2.0.0
+      country-telephone-data:
+        specifier: ^0.6.3
+        version: 0.6.3
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1
       drizzle-orm:
         specifier: ^0.39.3
         version: 0.39.3(@neondatabase/serverless@0.10.4)(@types/pg@8.11.6)
+      i18n-iso-countries:
+        specifier: ^7.14.0
+        version: 7.14.0
       jose:
         specifier: ^5.10.0
         version: 5.10.0
@@ -99,6 +108,9 @@ importers:
       '@types/bcryptjs':
         specifier: ^3.0.0
         version: 3.0.0
+      '@types/country-telephone-data':
+        specifier: ^0.6.3
+        version: 0.6.3
       '@types/node':
         specifier: ^20
         version: 20.19.37
@@ -1338,6 +1350,9 @@ packages:
   '@types/cookie@0.6.0':
     resolution: {integrity: sha512-4Kh9a6B2bQciAhf7FSuMRRkUWecJgJu9nPnx3yzpsfXX/c50REIqpHY4C82bXP90qrLtXtkDxTZosYO3UpOwlA==}
 
+  '@types/country-telephone-data@0.6.3':
+    resolution: {integrity: sha512-XRooLIe/i42PGpW/dP8hyEP8oFHkCJCe7wYQcl28BaC4fmUCYdyK8adVlepnAH9aRlIqr0mW/c6KRIBj78kgeg==}
+
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
 
@@ -1707,6 +1722,13 @@ packages:
     resolution: {integrity: sha512-6DnInpx7SJ2AK3+CTUE/ZM0vWTUboZCegxhC2xiIydHR9jNuTAASBrfEpHhiGOZw/nX51bHt6YQl8jsGo4y/0w==}
     engines: {node: '>= 0.6'}
 
+  country-flag-emoji-json@2.0.0:
+    resolution: {integrity: sha512-Ky1HU6jJRVQXrfgoutJ+7rTCzRnoPfD/75FIPVorXFI+/WurK0lgdUZBoxBE63hTFpKUbGWXN03IixPQGlk1Iw==}
+    engines: {node: '>=14.0.0'}
+
+  country-telephone-data@0.6.3:
+    resolution: {integrity: sha512-3tQLA0vec+NDVlcaHhXGqILq/oQRsv4fRi4EedCfJqUuJUjQGdcSPM8r2IJIT2kZ5yWbiOCkXMgy7YTo8FNS2w==}
+
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
     engines: {node: '>= 8'}
@@ -1768,6 +1790,9 @@ packages:
 
   detect-node-es@1.1.0:
     resolution: {integrity: sha512-ypdmJU/TbBby2Dxibuv7ZLW3Bs1QEmM7nHjEANfohJLvE0XVujisn1qPJcZxg+qDucsr+bP6fLD1rPS3AhJ7EQ==}
+
+  diacritics@1.3.0:
+    resolution: {integrity: sha512-wlwEkqcsaxvPJML+rDh/2iS824jbREk6DUMUKkEaSlxdYHeS43cClJtsWglvw2RfeXGm6ohKDqsXteJ5sP5enA==}
 
   didyoumean@1.2.2:
     resolution: {integrity: sha512-gxtyfqMg7GKyhQmb056K7M3xszy/myH8w+B4RT+QXBQsvAOdc3XymqDDPHx1BgPgsdAA5SIifona89YtRATDzw==}
@@ -2201,6 +2226,10 @@ packages:
   hasown@2.0.2:
     resolution: {integrity: sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ==}
     engines: {node: '>= 0.4'}
+
+  i18n-iso-countries@7.14.0:
+    resolution: {integrity: sha512-nXHJZYtNrfsi1UQbyRqm3Gou431elgLjKl//CYlnBGt5aTWdRPH1PiS2T/p/n8Q8LnqYqzQJik3Q7mkwvLokeg==}
+    engines: {node: '>= 12'}
 
   ignore@5.3.2:
     resolution: {integrity: sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g==}
@@ -4000,6 +4029,8 @@ snapshots:
 
   '@types/cookie@0.6.0': {}
 
+  '@types/country-telephone-data@0.6.3': {}
+
   '@types/estree@1.0.8': {}
 
   '@types/json-schema@7.0.15': {}
@@ -4378,6 +4409,10 @@ snapshots:
 
   cookie@0.7.1: {}
 
+  country-flag-emoji-json@2.0.0: {}
+
+  country-telephone-data@0.6.3: {}
+
   cross-spawn@7.0.6:
     dependencies:
       path-key: 3.1.1
@@ -4434,6 +4469,8 @@ snapshots:
     optional: true
 
   detect-node-es@1.1.0: {}
+
+  diacritics@1.3.0: {}
 
   didyoumean@1.2.2: {}
 
@@ -5010,6 +5047,10 @@ snapshots:
   hasown@2.0.2:
     dependencies:
       function-bind: 1.1.2
+
+  i18n-iso-countries@7.14.0:
+    dependencies:
+      diacritics: 1.3.0
 
   ignore@5.3.2: {}
 

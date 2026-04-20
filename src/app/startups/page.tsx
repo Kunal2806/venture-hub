@@ -629,12 +629,26 @@ export default function ApplyPage() {
     return () => { document.body.style.overflow = "unset"; };
   }, [showMobileMenu]);
 
-  function applyResult(id: string, r: VResult) {
-    setErrs(p  => { const n = { ...p };  r.error   ? (n[id] = r.error)   : delete n[id]; return n; });
-    setWarns(p => { const n = { ...p };  r.warning ? (n[id] = r.warning) : delete n[id]; return n; });
-    setOks(p   => { const n = { ...p };  r.success ? (n[id] = r.success) : delete n[id]; return n; });
-  }
-
+function applyResult(id: string, r: VResult) {
+  setErrs(p => {
+    const n = { ...p };
+    if (r.error) n[id] = r.error;
+    else delete n[id];
+    return n;
+  });
+  setWarns(p => {
+    const n = { ...p };
+    if (r.warning) n[id] = r.warning;
+    else delete n[id];
+    return n;
+  });
+  setOks(p => {
+    const n = { ...p };
+    if (r.success) n[id] = r.success;
+    else delete n[id];
+    return n;
+  });
+}
   function fieldCls(id: string) {
     if (errs[id])  return "border-red-300 bg-red-50/30";
     if (warns[id]) return "border-amber-300 bg-amber-50/20";

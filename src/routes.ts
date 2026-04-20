@@ -24,6 +24,7 @@ export const publicRoutes: string[] = [
 export const publicApis: string[] = [
   "/api/apply",
   "/api/investors/apply",
+  "/api/countries"
 ];
 
 // Routes which are used for authentication.
