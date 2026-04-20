@@ -7,7 +7,6 @@ import { Navigation } from "@/components/home/Navigation";
 import { VisionariesSection } from "@/components/home/Visionariessection";
 
 export default async function HomePage() {
-  const session = await auth();
 
   return (
     <div className="min-h-screen bg-[#F9F7F2]">
