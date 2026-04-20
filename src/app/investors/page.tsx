@@ -411,7 +411,7 @@ export default function InvestorApplyPage() {
   if (!isClient) {
     return (
       <div className="min-h-screen flex flex-col">
-        <Navigation activeItem="home" isLoggedIn={!!session?.user} />
+        <Navigation activeItem="home" />
         <main className="flex-1 pt-16 sm:pt-20 flex items-center justify-center">
           <div className="animate-pulse text-forest/40 text-sm">Loading…</div>
         </main>
@@ -421,7 +421,7 @@ export default function InvestorApplyPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-beige/30">
-      <Navigation activeItem="home" isLoggedIn={!!session?.user} />
+      <Navigation activeItem="home" />
 
       {/* Mobile progress bar */}
       <div className="lg:hidden sticky top-16 z-40 bg-white border-b border-forest/10 shadow-sm">
