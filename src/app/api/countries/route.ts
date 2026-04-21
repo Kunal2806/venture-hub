@@ -1,5 +1,3 @@
-
-
 import { NextResponse } from "next/server";
 import phoneData from "country-telephone-data";
 import isoCountries from "i18n-iso-countries";
@@ -9,14 +7,15 @@ import en from "i18n-iso-countries/langs/en.json";
 isoCountries.registerLocale(en);
 
 export interface CountryData {
-  code: string;     // "IN"
-  name: string;     // "India"
-  flag: string;     // "https://cdn.jsdelivr.net/npm/country-flag-emoji-json@2.0.0/dist/images/IN.svg"
-  dial: string;     // "+91"
+  code:     string; // "IN"
+  name:     string; // "India"
+  flag:     string; // SVG URL
+  dial:     string; // "+91"
   currency: string; // "INR"
 }
 
-// ─── Currency map (ISO-2 → ISO-4217) ─────────────────────────────────────
+// ─── Currency map (ISO-2 → ISO-4217) ──────────────────────────────────────────
+
 const CURRENCY_MAP: Record<string, string> = {
   AC: "SHP", AD: "EUR", AE: "AED", AF: "AFN", AG: "XCD", AI: "XCD",
   AL: "ALL", AM: "AMD", AO: "AOA", AQ: "USD", AR: "ARS", AS: "USD",
@@ -73,23 +72,21 @@ const CURRENCY_MAP: Record<string, string> = {
   ZA: "ZAR", ZM: "ZMW", ZW: "ZWL",
 };
 
-// ─── Build dataset once at module load (~1 ms, no I/O) ───────────────────
+// ─── Build dataset once at module load (~1 ms, no I/O) ────────────────────────
+
 const isoNames: Record<string, string> = isoCountries.getNames("en");
 
-// flagEmoji shape: [{ code: "IN", image: "https://cdn.jsdelivr.net/...", emoji: "🇮🇳" }]
 const flagMap: Record<string, string> = Object.fromEntries(
   (flagEmoji as Array<{ code: string; image: string }>).map((f) => [f.code, f.image])
 );
 
 interface RawCountry {
-  iso2: string;
-  dialCode: string;
+  iso2:      string;
+  dialCode:  string;
   priority?: number;
 }
 
 const COUNTRIES: CountryData[] = (phoneData.allCountries as RawCountry[])
-  // priority > 0 = secondary row for the same dial code (e.g. +1 shared by US & CA)
-  // keeping priority === 0 (or undefined) gives one clean entry per country
   .filter((c) => (c.priority ?? 0) === 0)
   .map((c) => {
     const code = c.iso2.toUpperCase();
@@ -104,11 +101,13 @@ const COUNTRIES: CountryData[] = (phoneData.allCountries as RawCountry[])
   .filter((c) => c.name && c.flag && c.dial.length > 1)
   .sort((a, b) => a.name.localeCompare(b.name));
 
-// ─── Route handler ────────────────────────────────────────────────────────
+// ─── Route handler ─────────────────────────────────────────────────────────────
+
 export async function GET() {
   return NextResponse.json(COUNTRIES, {
     headers: {
-      "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=3600",
+      "Cache-Control":          "public, s-maxage=86400, stale-while-revalidate=3600",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }
