@@ -9,18 +9,22 @@ import {
 import { Navigation } from "@/components/home/Navigation";
 import { Footer } from "@/components/home/Footer";
 import { parsePhoneNumber, isValidPhoneNumber, CountryCode } from "libphonenumber-js";
+import { CHAR_LIMITS, SECTOR_VALUES, SectorValue } from "@/lib/applicationSchema";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// Shared schema — single source of truth for client + server validation
+
+
+// ─── Types ─────────────────────────────────────────────────────────────────────
 
 interface CountryData {
-  code: string;      // "IN"
-  name: string;      // "India"
-  flag: string;      // SVG URL
-  dial: string;      // "+91"
-  currency: string;  // "INR"
+  code:     string;
+  name:     string;
+  flag:     string;
+  dial:     string;
+  currency: string;
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Constants ─────────────────────────────────────────────────────────────────
 
 const stageMapping = {
   "Ideation":     "IDEA",
@@ -28,7 +32,7 @@ const stageMapping = {
   "Seed / Early": "SEED",
 } as const;
 
-const industryOptions = [
+const industryOptions: { value: SectorValue; label: string }[] = [
   { value: "climatetech", label: "Climatetech" },
   { value: "biotech",     label: "Biotechnology" },
   { value: "agtech",      label: "Agtech" },
@@ -52,18 +56,6 @@ const steps = [
   { num: "04", title: "Capital Needs",    sub: "Terms & Deployment",  icon: "💰" },
   { num: "05", title: "The Collective",   sub: "Team & Outreach",     icon: "🤝" },
 ];
-
-const CHAR_LIMITS: Record<string, number> = {
-  founderName:       60,
-  companyName:       80,
-  websiteUrl:        200,
-  impactDescription: 500,
-  impactMetrics:     150,
-  capitalRequested:  20,
-  useOfFunds:        400,
-  pitchDeckUrl:      300,
-  country:           60,
-};
 
 const CURRENCIES = [
   { code: "USD", symbol: "$",    name: "US Dollar" },
@@ -102,6 +94,9 @@ const CURRENCIES = [
   { code: "EGP", symbol: "E£",   name: "Egyptian Pound" },
 ];
 
+// Valid currency codes set — used to validate capitalCurrency before sending to API
+const VALID_CURRENCY_CODES = new Set(CURRENCIES.map((c) => c.code));
+
 const PERIOD_UNITS = ["Days", "Months", "Years"] as const;
 type PeriodUnit = typeof PERIOD_UNITS[number];
 
@@ -137,7 +132,20 @@ const TZ_TO_CC: Record<string, string> = {
   "Europe/Warsaw": "PL", "Europe/Zurich": "CH", "Pacific/Auckland": "NZ",
 };
 
-// ─── Micro components ─────────────────────────────────────────────────────────
+// ─── Non-sensitive fields safe to persist in sessionStorage ───────────────────
+//
+// SECURITY: Email, mobile, and company details are NOT in this list.
+// sessionStorage clears on tab close, reducing the XSS exposure window.
+// We never use localStorage for PII.
+//
+const DRAFT_SAFE_FIELDS = [
+  "companyName", "sector", "stage", "websiteUrl",
+  "impactDescription", "impactMetrics", "useOfFunds",
+] as const;
+
+type DraftSafeField = typeof DRAFT_SAFE_FIELDS[number];
+
+// ─── Micro components ──────────────────────────────────────────────────────────
 
 function FieldError({ msg }: { msg?: string }) {
   if (!msg) return null;
@@ -175,7 +183,11 @@ function CharCount({ cur, max }: { cur: number; max: number }) {
   );
 }
 
-// ─── Field validation (single source of truth) ───────────────────────────────
+// ─── Client-side field validation ─────────────────────────────────────────────
+//
+// IMPORTANT: These rules mirror the shared Zod schema in lib/applicationSchema.ts
+// exactly. Client validation is UX-only; the server enforces all rules
+// independently. If you update a rule here, update the schema too.
 
 type VResult = { error?: string; warning?: string; success?: string };
 
@@ -188,12 +200,14 @@ function validate(
     case "founderName":
       if (!value.trim()) return { error: "Please enter your full name" };
       if (value.trim().length < 2) return { error: "At least 2 characters" };
+      if (value.length > CHAR_LIMITS.founderName) return { error: `Max ${CHAR_LIMITS.founderName} characters` };
       if (!/^[A-Za-z\u00C0-\u017E\s'\-]+$/.test(value.trim()))
         return { error: "Only letters, spaces, hyphens and apostrophes" };
       return { success: "Looks good" };
 
     case "email": {
       if (!value.trim()) return { error: "Email is required" };
+      if (value.length > CHAR_LIMITS.email) return { error: "Email is too long" };
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value.trim()))
         return { error: "Doesn't look valid — try name@company.com" };
       if (value.toLowerCase().endsWith(".con") || value.toLowerCase().endsWith(".cmo"))
@@ -220,18 +234,23 @@ function validate(
     case "companyName":
       if (!value.trim()) return { error: "Company name is required" };
       if (value.trim().length < 2) return { error: "At least 2 characters" };
+      if (value.length > CHAR_LIMITS.companyName) return { error: `Max ${CHAR_LIMITS.companyName} characters` };
       return { success: "Looks good" };
 
     case "sector":
       if (!value) return { error: "Please select an industry" };
+      // Validate against the shared allowlist — same check the server does
+      if (!(SECTOR_VALUES as readonly string[]).includes(value))
+        return { error: "Please select a valid industry" };
       return {};
 
     case "websiteUrl":
       if (!value.trim()) return { warning: "A website builds credibility with reviewers" };
-      if (!/^https?:\/\/.+\..+/.test(value.trim()))
-        return { error: "Must start with https:// — e.g. https://yoursite.com" };
       if (!value.trim().startsWith("https://"))
-        return { warning: "Consider using https:// for security" };
+        return { error: "Must start with https:// for security" };
+      if (!/^https:\/\/.+\..+/.test(value.trim()))
+        return { error: "Must be a valid URL — e.g. https://yoursite.com" };
+      if (value.length > CHAR_LIMITS.websiteUrl) return { error: `Max ${CHAR_LIMITS.websiteUrl} characters` };
       return { success: "Valid URL" };
 
     case "country":
@@ -241,10 +260,13 @@ function validate(
     case "impactDescription":
       if (!value.trim()) return { warning: "Describe your impact — reviewed 2× faster" };
       if (value.trim().length < 30) return { warning: "A bit more detail helps reviewers" };
+      if (value.length > CHAR_LIMITS.impactDescription) return { error: `Max ${CHAR_LIMITS.impactDescription} characters` };
       return { success: "Great — adds real depth to your application" };
 
     case "capitalRequested":
       if (!value.trim()) return { warning: "Specifying an amount helps investors assess fit" };
+      // Mirror server regex: digits, commas, dots only
+      if (!/^[\d.,]*$/.test(value)) return { error: "Please enter a numeric amount" };
       return {};
 
     case "fundingPeriod":
@@ -253,12 +275,16 @@ function validate(
 
     case "useOfFunds":
       if (!value.trim()) return { warning: "A brief breakdown increases reviewer confidence" };
+      if (value.length > CHAR_LIMITS.useOfFunds) return { error: `Max ${CHAR_LIMITS.useOfFunds} characters` };
       return {};
 
     case "pitchDeckUrl":
       if (!value.trim()) return { warning: "Applications with a pitch deck are 3× more likely to advance" };
-      if (!/^https?:\/\/.+\..+/.test(value.trim()))
+      if (!value.trim().startsWith("https://"))
         return { error: "Must start with https://" };
+      if (!/^https:\/\/.+\..+/.test(value.trim()))
+        return { error: "Must be a valid URL" };
+      if (value.length > CHAR_LIMITS.pitchDeckUrl) return { error: `Max ${CHAR_LIMITS.pitchDeckUrl} characters` };
       return { success: "Link looks valid" };
 
     default:
@@ -266,7 +292,7 @@ function validate(
   }
 }
 
-// ─── Phone country dropdown ───────────────────────────────────────────────────
+// ─── Phone country dropdown ────────────────────────────────────────────────────
 
 function PhoneCountryDropdown({
   value, onChange, countries, loading,
@@ -343,12 +369,7 @@ function PhoneCountryDropdown({
           : selected
             ? (
               <>
-                {/* ── FLAG FIXED: img instead of emoji span ── */}
-                <img
-                  src={selected.flag}
-                  alt={selected.name}
-                  className="w-5 h-3.5 object-cover rounded-sm flex-shrink-0"
-                />
+                <img src={selected.flag} alt={selected.name} className="w-5 h-3.5 object-cover rounded-sm flex-shrink-0" />
                 <span className="font-medium text-forest/70">{selected.dial}</span>
               </>
             )
@@ -394,12 +415,7 @@ function PhoneCountryDropdown({
                 }`}
                 onClick={() => { onChange(c.code); setOpen(false); setSearch(""); }}
               >
-                {/* ── FLAG FIXED: img instead of emoji span ── */}
-                <img
-                  src={c.flag}
-                  alt={c.name}
-                  className="w-5 h-3.5 object-cover rounded-sm flex-shrink-0"
-                />
+                <img src={c.flag} alt={c.name} className="w-5 h-3.5 object-cover rounded-sm flex-shrink-0" />
                 <span className="flex-1 truncate">{c.name}</span>
                 <span className={`text-xs tabular-nums font-medium ${value === c.code ? "text-white/70" : "text-forest/40"}`}>{c.dial}</span>
               </li>
@@ -414,7 +430,7 @@ function PhoneCountryDropdown({
   );
 }
 
-// ─── Currency + Amount input ──────────────────────────────────────────────────
+// ─── Currency + Amount input ───────────────────────────────────────────────────
 
 function CapitalInput({
   amount, currency, onAmountChange, onCurrencyChange, hasWarning,
@@ -507,7 +523,7 @@ function CapitalInput({
   );
 }
 
-// ─── Period picker ────────────────────────────────────────────────────────────
+// ─── Period picker ─────────────────────────────────────────────────────────────
 
 function PeriodInput({
   value, unit, onValueChange, onUnitChange, hasWarning,
@@ -546,13 +562,14 @@ function PeriodInput({
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function ApplyPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [emailWarning, setEmailWarning] = useState<string | null>(null);
 
   const [errs,  setErrs]  = useState<Record<string, string>>({});
   const [warns, setWarns] = useState<Record<string, string>>({});
@@ -590,17 +607,29 @@ export default function ApplyPage() {
 
   useEffect(() => { setIsClient(true); }, []);
 
+  // ── Restore draft from sessionStorage (non-sensitive fields only) ──────────
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("venturehub-application-draft");
+      const saved = sessionStorage.getItem("venturehub-draft");
       if (!saved) return;
       const p = JSON.parse(saved);
-      setForm(prev => ({ ...prev, ...p }));
-      if (p.dialCountry) setDialCountry(p.dialCountry);
-      if (p.capitalCurrency) setCapitalCurrency(p.capitalCurrency);
-      if (p.periodUnit) setPeriodUnit(p.periodUnit);
-      if (p.periodValue) setPeriodValue(p.periodValue);
-    } catch {}
+      // Only restore fields on the safe list — never email, mobile, or name
+      const patch: Partial<typeof form> = {};
+      for (const field of DRAFT_SAFE_FIELDS) {
+        if (typeof p[field] === "string") {
+          (patch as Record<string, string>)[field] = p[field];
+        }
+      }
+      setForm(prev => ({ ...prev, ...patch }));
+      if (p.dialCountry)    setDialCountry(p.dialCountry);
+      if (p.capitalCurrency && VALID_CURRENCY_CODES.has(p.capitalCurrency))
+        setCapitalCurrency(p.capitalCurrency);
+      if (p.periodUnit && (PERIOD_UNITS as readonly string[]).includes(p.periodUnit))
+        setPeriodUnit(p.periodUnit as PeriodUnit);
+      if (p.periodValue)    setPeriodValue(p.periodValue);
+    } catch {
+      // Corrupt storage — ignore silently
+    }
   }, []);
 
   useEffect(() => {
@@ -629,26 +658,12 @@ export default function ApplyPage() {
     return () => { document.body.style.overflow = "unset"; };
   }, [showMobileMenu]);
 
-function applyResult(id: string, r: VResult) {
-  setErrs(p => {
-    const n = { ...p };
-    if (r.error) n[id] = r.error;
-    else delete n[id];
-    return n;
-  });
-  setWarns(p => {
-    const n = { ...p };
-    if (r.warning) n[id] = r.warning;
-    else delete n[id];
-    return n;
-  });
-  setOks(p => {
-    const n = { ...p };
-    if (r.success) n[id] = r.success;
-    else delete n[id];
-    return n;
-  });
-}
+  function applyResult(id: string, r: VResult) {
+    setErrs(p => { const n = { ...p }; if (r.error) n[id] = r.error; else delete n[id]; return n; });
+    setWarns(p => { const n = { ...p }; if (r.warning) n[id] = r.warning; else delete n[id]; return n; });
+    setOks(p => { const n = { ...p }; if (r.success) n[id] = r.success; else delete n[id]; return n; });
+  }
+
   function fieldCls(id: string) {
     if (errs[id])  return "border-red-300 bg-red-50/30";
     if (warns[id]) return "border-amber-300 bg-amber-50/20";
@@ -658,7 +673,7 @@ function applyResult(id: string, r: VResult) {
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
     const { id, value } = e.target;
-    const limit = CHAR_LIMITS[id];
+    const limit = CHAR_LIMITS[id as keyof typeof CHAR_LIMITS];
     const v = limit ? value.slice(0, limit) : value;
     setForm(prev => ({ ...prev, [id]: v }));
     setSubmitError(null);
@@ -715,10 +730,17 @@ function applyResult(id: string, r: VResult) {
     return ok;
   }
 
+  // ── Save draft: only non-sensitive fields to sessionStorage ───────────────
   const saveDraft = () => {
-    localStorage.setItem("venturehub-application-draft", JSON.stringify({
-      ...form, dialCountry, capitalCurrency, periodUnit, periodValue,
-    }));
+    try {
+      const safeDraft: Record<string, string> = { dialCountry, capitalCurrency, periodUnit, periodValue };
+      for (const field of DRAFT_SAFE_FIELDS) {
+        safeDraft[field] = (form as Record<string, string>)[field] ?? "";
+      }
+      sessionStorage.setItem("venturehub-draft", JSON.stringify(safeDraft));
+    } catch {
+      // sessionStorage unavailable — fail silently
+    }
   };
 
   const handleNext = () => {
@@ -760,15 +782,20 @@ function applyResult(id: string, r: VResult) {
     }
     setIsSubmitting(true);
     setSubmitError(null);
-    try {
-      localStorage.setItem("application-email", form.email);
+    setEmailWarning(null);
 
+    try {
       let formattedPhone: string | undefined;
       if (form.mobile.trim() && dialCountry) {
         try {
           formattedPhone = parsePhoneNumber(form.mobile, dialCountry as CountryCode).formatInternational();
-        } catch { formattedPhone = form.mobile; }
+        } catch {
+          formattedPhone = form.mobile;
+        }
       }
+
+      // Validate currency code before sending — must be in our allowlist
+      const safeCurrency = VALID_CURRENCY_CODES.has(capitalCurrency) ? capitalCurrency : "USD";
 
       const response = await fetch("/api/apply", {
         method: "POST",
@@ -780,26 +807,34 @@ function applyResult(id: string, r: VResult) {
           companyName:       form.companyName,
           sector:            form.sector,
           stage:             stageMapping[form.stage as keyof typeof stageMapping],
-          country:           form.country   || undefined,
-          websiteUrl:        form.websiteUrl || undefined,
-          pitchDeckUrl:      form.pitchDeckUrl || undefined,
+          country:           form.country        || undefined,
+          websiteUrl:        form.websiteUrl      || undefined,
+          pitchDeckUrl:      form.pitchDeckUrl    || undefined,
           impactDescription: form.impactDescription || undefined,
-          impactMetrics:     form.impactMetrics     || undefined,
-          useOfFunds:        form.useOfFunds        || undefined,
-          fundingPeriod:     form.fundingPeriod     || undefined,
-          capitalRequested:  form.capitalRequested ? `${capitalCurrency} ${form.capitalRequested}` : undefined,
-          capitalCurrency,
+          impactMetrics:     form.impactMetrics    || undefined,
+          useOfFunds:        form.useOfFunds       || undefined,
+          fundingPeriod:     form.fundingPeriod    || undefined,
+          capitalRequested:  form.capitalRequested || undefined,
+          capitalCurrency:   safeCurrency,
         }),
       });
 
       const data = await response.json();
+
       if (!response.ok) {
+        if (response.status === 429) throw new Error("Too many requests. Please wait a moment and try again.");
         if (response.status === 409) throw new Error("An application with this email already exists.");
-        if (response.status === 400 && data.details) throw new Error(data.details.map((d: { message: string }) => d.message).join(". "));
+        if (response.status === 400 && data.details)
+          throw new Error(data.details.map((d: { message: string }) => d.message).join(". "));
         throw new Error(data.error || "Something went wrong. Please try again.");
       }
 
-      localStorage.removeItem("venturehub-application-draft");
+      // Clear only the draft — never stored sensitive data there anyway
+      try { sessionStorage.removeItem("venturehub-draft"); } catch {}
+
+      // Surface email warning if confirmation failed
+      if (data.emailWarning) setEmailWarning(data.emailWarning);
+
       router.push("/startups/success");
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Something went wrong");
@@ -821,7 +856,6 @@ function applyResult(id: string, r: VResult) {
     );
   }
 
-  // Helper: get selected country object
   const selectedCountry = countries.find(c => c.code === dialCountry);
 
   return (
@@ -893,6 +927,13 @@ function applyResult(id: string, r: VResult) {
                   </div>
                 )}
 
+                {emailWarning && (
+                  <div className="mx-4 sm:mx-8 mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+                    <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-amber-700 text-xs">{emailWarning}</p>
+                  </div>
+                )}
+
                 <form className="p-4 sm:p-8 lg:p-12 space-y-8 lg:space-y-12" onSubmit={e => e.preventDefault()}>
 
                   {/* ── Step 1 ── */}
@@ -943,12 +984,7 @@ function applyResult(id: string, r: VResult) {
                         {countryAutoFilled && dialCountry && selectedCountry && (
                           <div className="flex items-center gap-1.5 mt-1.5">
                             <CheckCircle className="w-3 h-3 text-green-600 flex-shrink-0" />
-                            {/* ── FLAG FIXED: img instead of emoji in auto-detect hint ── */}
-                            <img
-                              src={selectedCountry.flag}
-                              alt={selectedCountry.name}
-                              className="w-4 h-3 object-cover rounded-sm"
-                            />
+                            <img src={selectedCountry.flag} alt={selectedCountry.name} className="w-4 h-3 object-cover rounded-sm" />
                             <p className="text-[10px] text-forest/50">
                               Auto-detected: <span className="font-medium text-forest/70">{selectedCountry.name}</span>
                             </p>
@@ -1087,12 +1123,15 @@ function applyResult(id: string, r: VResult) {
                               setForm(p => ({ ...p, capitalRequested: v }));
                               applyResult("capitalRequested", validate("capitalRequested", v));
                             }}
-                            onCurrencyChange={code => setCapitalCurrency(code)}
+                            onCurrencyChange={code => {
+                              // Only accept codes from the allowlist
+                              if (VALID_CURRENCY_CODES.has(code)) setCapitalCurrency(code);
+                            }}
                             hasWarning={!!warns.capitalRequested}
                           />
                           <FieldWarn msg={warns.capitalRequested} />
                           <p className="text-[10px] text-forest/30 mt-1">
-                            Currency auto-set from region · change freely · <span className="font-medium text-forest/50">saved in DB with application</span>
+                            Currency auto-set from region · change freely
                           </p>
                         </div>
 
@@ -1197,8 +1236,8 @@ function applyResult(id: string, r: VResult) {
             </div>
             <div className="p-3 overflow-y-auto">
               {steps.map((step, index) => {
-                const done = index < currentStep;
-                const curr = index === currentStep;
+                const done  = index < currentStep;
+                const curr  = index === currentStep;
                 const avail = index <= currentStep;
                 return (
                   <button key={step.num} onClick={() => avail && handleStepClick(index)} disabled={!avail}
