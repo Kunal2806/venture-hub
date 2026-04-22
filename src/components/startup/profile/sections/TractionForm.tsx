@@ -23,8 +23,8 @@ const METRIC_FIELDS: FieldDef[] = [
 ];
 
 const FUNDING_FIELDS: FieldDef[] = [
-  { name: "fundingAskMin", label: "Funding Ask — Minimum", placeholder: "500000", prefix: "$" },
-  { name: "fundingAskMax", label: "Funding Ask — Maximum", placeholder: "2000000", prefix: "$" },
+  // { name: "fundingAskMin", label: "Funding Ask — Minimum", placeholder: "500000", prefix: "$" },
+  // { name: "fundingAskMax", label: "Funding Ask — Maximum", placeholder: "2000000", prefix: "$" },
   { name: "equityOffered", label: "Equity Offered", placeholder: "10", suffix: "%" },
 ];
 
@@ -39,7 +39,9 @@ export default function TractionForm({ profile, userId, onSaved }: Props) {
     if (equity && (parseFloat(equity) < 0 || parseFloat(equity) > 100)) {
       errs.equityOffered = "Equity must be between 0 and 100%.";
     }
-    const numFields = ["revenueMonthly", "revenueAnnual", "userCount", "growthRate", "fundingAskMin", "fundingAskMax"];
+    //  const numFields = ["revenueMonthly", "revenueAnnual", "userCount", "growthRate", "fundingAskMin", "fundingAskMax"];
+
+    const numFields = ["revenueMonthly", "revenueAnnual", "userCount", "growthRate"];
     for (const f of numFields) {
       const v = fd.get(f) as string;
       if (v && isNaN(parseFloat(v))) errs[f] = "Must be a number.";

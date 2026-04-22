@@ -5,21 +5,52 @@ import { useRouter } from "next/navigation";
 import { Navigation } from "@/components/home/Navigation";
 import { Footer } from "@/components/home/Footer";
 import { CheckCircle, Mail, Clock, ArrowRight } from "lucide-react";
+import ReactConfetti from "react-confetti";  // ADD THIS
 
 export default function ApplySuccessPage() {
   const router = useRouter();
   const [email, setEmail] = useState<string>("");
+  
+  // ADD THESE THREE
+  const [showConfetti, setShowConfetti] = useState(true);
+  const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
-    // Get email from localStorage or query params
     const savedEmail = localStorage.getItem("application-email");
-    if (savedEmail) {
-      setEmail(savedEmail);
-    }
+    if (savedEmail) setEmail(savedEmail);
+  }, []);
+
+  // ADD THIS EFFECT
+  useEffect(() => {
+    const update = () =>
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    update();
+    window.addEventListener("resize", update);
+
+    const timer = setTimeout(() => setShowConfetti(false), 5000); // stops after 5s
+
+    return () => {
+      window.removeEventListener("resize", update);
+      clearTimeout(timer);
+    };
   }, []);
 
   return (
     <div className="min-h-screen flex flex-col">
+
+      {/* ADD THIS BLOCK */}
+      {showConfetti && (
+        <ReactConfetti
+          width={windowSize.width}
+          height={windowSize.height}
+          numberOfPieces={400}
+          recycle={false}
+          gravity={0.2}
+          colors={["#1a3a2a", "#4ade80", "#86efac", "#d4a574", "#fef3c7", "#f0fdf4", "#a3e635"]}
+          style={{ position: "fixed", top: 0, left: 0, zIndex: 9999, pointerEvents: "none" }}
+        />
+      )}
+
       <Navigation activeItem="startups" />
 
       <main className="flex-1 pt-24 sm:pt-32 pb-20 sm:pb-40 px-4 sm:px-8">

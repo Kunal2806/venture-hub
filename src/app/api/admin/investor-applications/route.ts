@@ -284,6 +284,8 @@ export async function PATCH(req: NextRequest) {
 
   // ── APPROVE ───────────────────────────────────────────────────────────
   if (action === "approve") {
+    let userId: string;
+
     const [existingUser] = await db
       .select({ id: UsersTable.id })
       .from(UsersTable)
@@ -291,10 +293,18 @@ export async function PATCH(req: NextRequest) {
       .limit(1);
 
     if (existingUser) {
-      return NextResponse.json(
-        { error: "A user with this email already exists" },
-        { status: 409 }
-      );
+      // User already exists — just approve the application and link them
+      userId = existingUser.id;
+      await db.update(InvestorApplicationsTable).set({
+        status:        "APPROVED",
+        reviewedBy:    admin.id,
+        reviewNotes:   reviewNotes || null,
+        reviewedAt:    now,
+        createdUserId: userId,
+        updatedAt:     now,
+      }).where(eq(InvestorApplicationsTable.id, id));
+
+      return NextResponse.json({ success: true, status: "APPROVED", userId, existingUser: true });
     }
 
     const tempPassword       = generateTempPassword();

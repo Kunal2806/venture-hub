@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   Save, CheckCircle, Loader2, AlertCircle,
   ChevronLeft, ChevronRight, X, ChevronDown, Search,
@@ -10,9 +11,6 @@ import { Navigation } from "@/components/home/Navigation";
 import { Footer } from "@/components/home/Footer";
 import { parsePhoneNumber, isValidPhoneNumber, CountryCode } from "libphonenumber-js";
 import { CHAR_LIMITS, SECTOR_VALUES, SectorValue } from "@/lib/applicationSchema";
-
-// Shared schema — single source of truth for client + server validation
-
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -31,6 +29,9 @@ const stageMapping = {
   "MVP":          "PRE_SEED",
   "Seed / Early": "SEED",
 } as const;
+
+// FIX: Type the stageMapping keys explicitly so TypeScript narrows correctly
+type StageLabel = keyof typeof stageMapping;
 
 const industryOptions: { value: SectorValue; label: string }[] = [
   { value: "climatetech", label: "Climatetech" },
@@ -94,7 +95,6 @@ const CURRENCIES = [
   { code: "EGP", symbol: "E£",   name: "Egyptian Pound" },
 ];
 
-// Valid currency codes set — used to validate capitalCurrency before sending to API
 const VALID_CURRENCY_CODES = new Set(CURRENCIES.map((c) => c.code));
 
 const PERIOD_UNITS = ["Days", "Months", "Years"] as const;
@@ -132,12 +132,7 @@ const TZ_TO_CC: Record<string, string> = {
   "Europe/Warsaw": "PL", "Europe/Zurich": "CH", "Pacific/Auckland": "NZ",
 };
 
-// ─── Non-sensitive fields safe to persist in sessionStorage ───────────────────
-//
-// SECURITY: Email, mobile, and company details are NOT in this list.
-// sessionStorage clears on tab close, reducing the XSS exposure window.
-// We never use localStorage for PII.
-//
+// FIX: Only non-PII fields are safe to persist in sessionStorage
 const DRAFT_SAFE_FIELDS = [
   "companyName", "sector", "stage", "websiteUrl",
   "impactDescription", "impactMetrics", "useOfFunds",
@@ -182,12 +177,6 @@ function CharCount({ cur, max }: { cur: number; max: number }) {
     }`}>{cur}/{max}</span>
   );
 }
-
-// ─── Client-side field validation ─────────────────────────────────────────────
-//
-// IMPORTANT: These rules mirror the shared Zod schema in lib/applicationSchema.ts
-// exactly. Client validation is UX-only; the server enforces all rules
-// independently. If you update a rule here, update the schema too.
 
 type VResult = { error?: string; warning?: string; success?: string };
 
@@ -239,7 +228,6 @@ function validate(
 
     case "sector":
       if (!value) return { error: "Please select an industry" };
-      // Validate against the shared allowlist — same check the server does
       if (!(SECTOR_VALUES as readonly string[]).includes(value))
         return { error: "Please select a valid industry" };
       return {};
@@ -263,11 +251,12 @@ function validate(
       if (value.length > CHAR_LIMITS.impactDescription) return { error: `Max ${CHAR_LIMITS.impactDescription} characters` };
       return { success: "Great — adds real depth to your application" };
 
-    case "capitalRequested":
+    case "capitalRequested": {
       if (!value.trim()) return { warning: "Specifying an amount helps investors assess fit" };
-      // Mirror server regex: digits, commas, dots only
-      if (!/^[\d.,]*$/.test(value)) return { error: "Please enter a numeric amount" };
+      const digits = value.replace(/[^\d]/g, "");
+      if (!digits) return { error: "Please enter a numeric amount" };
       return {};
+    }
 
     case "fundingPeriod":
       if (!value.trim()) return { warning: "Let investors know your expected runway" };
@@ -290,6 +279,68 @@ function validate(
     default:
       return {};
   }
+}
+
+// ─── Industry dropdown ─────────────────────────────────────────────────────────
+
+function IndustryDropdown({
+  value, onChange, hasError,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  hasError?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = industryOptions.find(o => o.value === value);
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className={`input-field w-full flex items-center justify-between gap-2 cursor-pointer select-none text-left ${
+          hasError ? "border-red-300 bg-red-50/30" : ""
+        }`}
+      >
+        <span className={selected ? "text-forest text-sm font-medium" : "text-forest/35 text-sm"}>
+          {selected ? selected.label : "Select Industry"}
+        </span>
+        <ChevronDown className={`w-3.5 h-3.5 text-forest/40 flex-shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-1.5 w-full bg-white border border-forest/12 rounded-xl shadow-2xl z-[100] overflow-hidden">
+          <ul className="overflow-y-auto max-h-64 py-1.5">
+            {industryOptions.map(o => (
+              <li
+                key={o.value}
+                onClick={() => { onChange(o.value); setOpen(false); }}
+                className={`flex items-center justify-between px-4 py-2.5 text-sm cursor-pointer transition-colors ${
+                  value === o.value
+                    ? "bg-forest text-white font-medium"
+                    : "text-forest hover:bg-beige/60"
+                }`}
+              >
+                <span>{o.label}</span>
+                {value === o.value && (
+                  <CheckCircle className="w-3.5 h-3.5 text-white/70 flex-shrink-0" />
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Phone country dropdown ────────────────────────────────────────────────────
@@ -338,7 +389,7 @@ function PhoneCountryDropdown({
       const el = listRef.current.children[idx + 1] as HTMLElement;
       el?.scrollIntoView({ block: "nearest" });
     }
-  }, [open]);
+  }, [open, value, filtered]);
 
   function onTriggerKey(e: React.KeyboardEvent) {
     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(true); return; }
@@ -353,13 +404,13 @@ function PhoneCountryDropdown({
   }
 
   return (
-    <div className="relative flex-shrink-0" ref={ref}>
+    <div className="relative" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
         onKeyDown={onTriggerKey}
         disabled={loading}
-        className="input-field flex items-center gap-2 pr-8 min-w-[130px] cursor-pointer select-none"
+        className="input-field w-full flex items-center gap-2 pr-8 cursor-pointer select-none"
         style={{ fontSize: 13 }}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -369,7 +420,14 @@ function PhoneCountryDropdown({
           : selected
             ? (
               <>
-                <img src={selected.flag} alt={selected.name} className="w-5 h-3.5 object-cover rounded-sm flex-shrink-0" />
+                <Image
+                  src={selected.flag}
+                  alt={selected.name}
+                  width={20}
+                  height={14}
+                  style={{ width: 20, height: 14 }}
+                  className="object-cover rounded-sm flex-shrink-0"
+                />
                 <span className="font-medium text-forest/70">{selected.dial}</span>
               </>
             )
@@ -415,13 +473,20 @@ function PhoneCountryDropdown({
                 }`}
                 onClick={() => { onChange(c.code); setOpen(false); setSearch(""); }}
               >
-                <img src={c.flag} alt={c.name} className="w-5 h-3.5 object-cover rounded-sm flex-shrink-0" />
+                <Image
+                  src={c.flag}
+                  alt={c.name}
+                  width={20}
+                  height={14}
+                  style={{ width: 20, height: 14 }}
+                  className="object-cover rounded-sm flex-shrink-0"
+                />
                 <span className="flex-1 truncate">{c.name}</span>
                 <span className={`text-xs tabular-nums font-medium ${value === c.code ? "text-white/70" : "text-forest/40"}`}>{c.dial}</span>
               </li>
             ))}
             {filtered.length === 0 && (
-              <li className="px-4 py-4 text-sm text-forest/40 text-center">No results for "{search}"</li>
+              <li className="px-4 py-4 text-sm text-forest/40 text-center">No results for &quot;{search}&quot;</li>
             )}
           </ul>
         </div>
@@ -431,6 +496,33 @@ function PhoneCountryDropdown({
 }
 
 // ─── Currency + Amount input ───────────────────────────────────────────────────
+
+const MAX_CAPITAL_BY_CURRENCY: Record<string, number> = {
+  INR: 990_000_000,
+  USD: 100_000_000,
+  EUR: 100_000_000,
+  GBP: 100_000_000,
+  DEFAULT: 999_999_999,
+};
+
+function formatAmount(raw: string, currencyCode: string): string {
+  const digits = raw.replace(/[^\d]/g, "");
+  if (!digits) return "";
+  const num = parseInt(digits, 10);
+  if (isNaN(num)) return "";
+  const max = MAX_CAPITAL_BY_CURRENCY[currencyCode] ?? MAX_CAPITAL_BY_CURRENCY.DEFAULT;
+  const clamped = Math.min(num, max);
+
+  if (currencyCode === "INR") {
+    const s = clamped.toString();
+    if (s.length <= 3) return s;
+    const last3 = s.slice(-3);
+    const rest = s.slice(0, -3);
+    return rest.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + last3;
+  }
+
+  return clamped.toLocaleString("en-US");
+}
 
 function CapitalInput({
   amount, currency, onAmountChange, onCurrencyChange, hasWarning,
@@ -460,6 +552,17 @@ function CapitalInput({
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
+
+  function handleAmountChange(raw: string) {
+    onAmountChange(formatAmount(raw, currency));
+  }
+
+  function handleCurrencyChange(code: string) {
+    onCurrencyChange(code);
+    if (amount) onAmountChange(formatAmount(amount, code));
+  }
+
+  const maxLabel = currency === "INR" ? "Max ₹99 Crore" : "Max 100M";
 
   return (
     <div className={`flex border rounded-lg transition-colors bg-white ${hasWarning ? "border-amber-300" : "border-forest/15"}`}>
@@ -495,7 +598,7 @@ function CapitalInput({
                   className={`flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer transition-colors ${
                     currency === c.code ? "bg-forest text-white" : "text-forest hover:bg-beige/60"
                   }`}
-                  onClick={() => { onCurrencyChange(c.code); setOpen(false); setSearch(""); }}
+                  onClick={() => { handleCurrencyChange(c.code); setOpen(false); setSearch(""); }}
                 >
                   <span className={`w-8 font-bold text-[15px] ${currency === c.code ? "text-white" : "text-forest/60"}`}>{c.symbol}</span>
                   <span className="flex-1 truncate">{c.name}</span>
@@ -514,11 +617,11 @@ function CapitalInput({
         type="text"
         inputMode="numeric"
         className="flex-1 px-3 py-2.5 text-sm text-forest bg-transparent outline-none placeholder-forest/30 min-w-0"
-        placeholder="500,000"
+        placeholder={currency === "INR" ? "50,00,000" : "500,000"}
         value={amount}
-        maxLength={CHAR_LIMITS.capitalRequested}
-        onChange={e => onAmountChange(e.target.value.replace(/[^\d.,]/g, "").slice(0, CHAR_LIMITS.capitalRequested))}
+        onChange={e => handleAmountChange(e.target.value)}
       />
+      <span className="flex-shrink-0 self-center pr-3 text-[10px] text-forest/30 whitespace-nowrap">{maxLabel}</span>
     </div>
   );
 }
@@ -590,13 +693,14 @@ export default function ApplyPage() {
   const [form, setForm] = useState({
     founderName: "", email: "", mobile: "",
     companyName: "", sector: "",
-    stage: "Seed / Early" as typeof stages[number],
+    stage: "Seed / Early" as StageLabel,
     country: "", websiteUrl: "",
     impactDescription: "", impactMetrics: "",
     capitalRequested: "", fundingPeriod: "", useOfFunds: "",
     pitchDeckUrl: "",
   });
 
+  // ── Load countries ──────────────────────────────────────────────────────────
   useEffect(() => {
     fetch("/api/countries")
       .then(r => r.ok ? r.json() : Promise.reject())
@@ -607,31 +711,48 @@ export default function ApplyPage() {
 
   useEffect(() => { setIsClient(true); }, []);
 
-  // ── Restore draft from sessionStorage (non-sensitive fields only) ──────────
+  // ── Restore draft from sessionStorage ──────────────────────────────────────
   useEffect(() => {
     try {
-      const saved = sessionStorage.getItem("venturehub-draft");
+      const saved =
+        sessionStorage.getItem("venturehub-draft") ??
+        localStorage.getItem("venturehub-draft");
       if (!saved) return;
       const p = JSON.parse(saved);
-      // Only restore fields on the safe list — never email, mobile, or name
-      const patch: Partial<typeof form> = {};
-      for (const field of DRAFT_SAFE_FIELDS) {
-        if (typeof p[field] === "string") {
-          (patch as Record<string, string>)[field] = p[field];
-        }
-      }
-      setForm(prev => ({ ...prev, ...patch }));
-      if (p.dialCountry)    setDialCountry(p.dialCountry);
-      if (p.capitalCurrency && VALID_CURRENCY_CODES.has(p.capitalCurrency))
+
+      setForm(prev => ({
+        ...prev,
+        companyName:       typeof p.companyName       === "string" ? p.companyName       : prev.companyName,
+        sector:            typeof p.sector             === "string" ? p.sector             : prev.sector,
+        stage:             (typeof p.stage === "string" && p.stage in stageMapping)
+                            ? p.stage as StageLabel
+                            : prev.stage,
+        websiteUrl:        typeof p.websiteUrl         === "string" ? p.websiteUrl         : prev.websiteUrl,
+        impactDescription: typeof p.impactDescription  === "string" ? p.impactDescription  : prev.impactDescription,
+        impactMetrics:     typeof p.impactMetrics       === "string" ? p.impactMetrics       : prev.impactMetrics,
+        useOfFunds:        typeof p.useOfFunds          === "string" ? p.useOfFunds          : prev.useOfFunds,
+        country:           typeof p.country             === "string" ? p.country             : prev.country,
+        pitchDeckUrl:      typeof p.pitchDeckUrl        === "string" ? p.pitchDeckUrl        : prev.pitchDeckUrl,
+        capitalRequested:  typeof p.capitalRequested    === "string" ? p.capitalRequested    : prev.capitalRequested,
+        fundingPeriod:     typeof p.fundingPeriod       === "string" ? p.fundingPeriod       : prev.fundingPeriod,
+      }));
+
+      if (typeof p.dialCountry === "string" && p.dialCountry)
+        setDialCountry(p.dialCountry);
+
+      if (typeof p.capitalCurrency === "string" && VALID_CURRENCY_CODES.has(p.capitalCurrency))
         setCapitalCurrency(p.capitalCurrency);
-      if (p.periodUnit && (PERIOD_UNITS as readonly string[]).includes(p.periodUnit))
+
+      if (typeof p.periodUnit === "string" && (PERIOD_UNITS as readonly string[]).includes(p.periodUnit))
         setPeriodUnit(p.periodUnit as PeriodUnit);
-      if (p.periodValue)    setPeriodValue(p.periodValue);
-    } catch {
-      // Corrupt storage — ignore silently
-    }
+
+      if (typeof p.periodValue === "string")
+        setPeriodValue(p.periodValue);
+
+    } catch {}
   }, []);
 
+  // ── Auto-detect country from timezone ──────────────────────────────────────
   useEffect(() => {
     if (!isClient || countriesLoading || !countries.length || dialCountry) return;
     try {
@@ -645,12 +766,14 @@ export default function ApplyPage() {
       setCapitalCurrency(found.currency || "USD");
       setCountryAutoFilled(true);
     } catch {}
-  }, [isClient, countriesLoading, countries]);
+  }, [isClient, countriesLoading, countries, dialCountry]);
 
+  // ── Keep fundingPeriod in sync with periodValue + periodUnit ───────────────
   useEffect(() => {
     const combined = periodValue ? `${periodValue} ${periodUnit}` : "";
     setForm(prev => ({ ...prev, fundingPeriod: combined }));
     applyResult("fundingPeriod", validate("fundingPeriod", combined));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodValue, periodUnit]);
 
   useEffect(() => {
@@ -730,17 +853,31 @@ export default function ApplyPage() {
     return ok;
   }
 
-  // ── Save draft: only non-sensitive fields to sessionStorage ───────────────
   const saveDraft = () => {
     try {
-      const safeDraft: Record<string, string> = { dialCountry, capitalCurrency, periodUnit, periodValue };
-      for (const field of DRAFT_SAFE_FIELDS) {
-        safeDraft[field] = (form as Record<string, string>)[field] ?? "";
-      }
-      sessionStorage.setItem("venturehub-draft", JSON.stringify(safeDraft));
-    } catch {
-      // sessionStorage unavailable — fail silently
-    }
+      const payload = {
+        // string fields
+        companyName:       form.companyName,
+        sector:            form.sector,
+        stage:             form.stage,
+        websiteUrl:        form.websiteUrl,
+        impactDescription: form.impactDescription,
+        impactMetrics:     form.impactMetrics,
+        useOfFunds:        form.useOfFunds,
+        country:           form.country,
+        pitchDeckUrl:      form.pitchDeckUrl,
+        capitalRequested:  form.capitalRequested,
+        fundingPeriod:     form.fundingPeriod,
+        // extra state
+        dialCountry,
+        capitalCurrency,
+        periodUnit,
+        periodValue,
+      };
+      const serialized = JSON.stringify(payload);
+      sessionStorage.setItem("venturehub-draft", serialized);
+      localStorage.setItem("venturehub-draft", serialized);
+    } catch {}
   };
 
   const handleNext = () => {
@@ -785,6 +922,7 @@ export default function ApplyPage() {
     setEmailWarning(null);
 
     try {
+      // ── Format phone to E.164 if a country code is selected ──────────────
       let formattedPhone: string | undefined;
       if (form.mobile.trim() && dialCountry) {
         try {
@@ -794,8 +932,20 @@ export default function ApplyPage() {
         }
       }
 
-      // Validate currency code before sending — must be in our allowlist
+      // ── Validate currency code against allowlist ──────────────────────────
       const safeCurrency = VALID_CURRENCY_CODES.has(capitalCurrency) ? capitalCurrency : "USD";
+
+      // FIX: Send capitalRequested as-is (commas included).
+      // The schema regex /^[\d.,]*$/ accepts formatted numbers like "5,00,000".
+      // The route prefixes the currency: "INR 5,00,000" stored in one column.
+      const rawCapital = form.capitalRequested || undefined;
+
+      // FIX: Ensure stage is always a valid mapped value — guard against
+      // stale state where form.stage somehow isn't a known key.
+      const mappedStage = stageMapping[form.stage];
+      if (!mappedStage) {
+        throw new Error("Invalid stage selected. Please go back to Step 2 and reselect.");
+      }
 
       const response = await fetch("/api/apply", {
         method: "POST",
@@ -803,18 +953,22 @@ export default function ApplyPage() {
         body: JSON.stringify({
           founderName:       form.founderName,
           email:             form.email,
-          mobile:            formattedPhone,
+          // FIX: Only include mobile if it has a value — omitting sends
+          // undefined which the schema treats as optional (absent), not "".
+          mobile:            formattedPhone || undefined,
           companyName:       form.companyName,
           sector:            form.sector,
-          stage:             stageMapping[form.stage as keyof typeof stageMapping],
-          country:           form.country        || undefined,
-          websiteUrl:        form.websiteUrl      || undefined,
-          pitchDeckUrl:      form.pitchDeckUrl    || undefined,
+          stage:             mappedStage,
+          country:           form.country           || undefined,
+          // FIX: Send empty-string optional URLs as undefined so the schema's
+          // .optional() branch is hit instead of the isSafeUrl() refine branch.
+          websiteUrl:        form.websiteUrl        || undefined,
+          pitchDeckUrl:      form.pitchDeckUrl      || undefined,
           impactDescription: form.impactDescription || undefined,
-          impactMetrics:     form.impactMetrics    || undefined,
-          useOfFunds:        form.useOfFunds       || undefined,
-          fundingPeriod:     form.fundingPeriod    || undefined,
-          capitalRequested:  form.capitalRequested || undefined,
+          impactMetrics:     form.impactMetrics      || undefined,
+          useOfFunds:        form.useOfFunds         || undefined,
+          fundingPeriod:     form.fundingPeriod      || undefined,
+          capitalRequested:  rawCapital,
           capitalCurrency:   safeCurrency,
         }),
       });
@@ -822,20 +976,36 @@ export default function ApplyPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        if (response.status === 429) throw new Error("Too many requests. Please wait a moment and try again.");
-        if (response.status === 409) throw new Error("An application with this email already exists.");
-        if (response.status === 400 && data.details)
-          throw new Error(data.details.map((d: { message: string }) => d.message).join(". "));
+        if (response.status === 429) {
+          throw new Error("Too many requests. Please wait a moment and try again.");
+        }
+        if (response.status === 409) {
+          throw new Error("An application with this email already exists.");
+        }
+        // FIX: Surface Zod field-level errors clearly so the user knows
+        // exactly which field failed instead of seeing generic "Required"
+        if (response.status === 400) {
+          if (data.details && Array.isArray(data.details)) {
+            const msgs = data.details
+              .map((d: { field: string; message: string }) =>
+                d.field ? `${d.field}: ${d.message}` : d.message
+              )
+              .join("\n");
+            throw new Error(msgs);
+          }
+          throw new Error(data.error || "Validation failed — please check all fields.");
+        }
         throw new Error(data.error || "Something went wrong. Please try again.");
       }
 
-      // Clear only the draft — never stored sensitive data there anyway
-      try { sessionStorage.removeItem("venturehub-draft"); } catch {}
-
-      // Surface email warning if confirmation failed
+      // ── Success ───────────────────────────────────────────────────────────
+      try {
+        sessionStorage.removeItem("venturehub-draft");
+        localStorage.removeItem("venturehub-draft");
+      } catch {}
       if (data.emailWarning) setEmailWarning(data.emailWarning);
-
       router.push("/startups/success");
+
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -922,7 +1092,8 @@ export default function ApplyPage() {
                     <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="text-red-700 text-sm font-medium">Submission failed</p>
-                      <p className="text-red-600 text-xs mt-0.5">{submitError}</p>
+                      {/* FIX: Use whitespace-pre-line so \n-separated field errors render on separate lines */}
+                      <p className="text-red-600 text-xs mt-0.5 whitespace-pre-line">{submitError}</p>
                     </div>
                   </div>
                 )}
@@ -936,7 +1107,7 @@ export default function ApplyPage() {
 
                 <form className="p-4 sm:p-8 lg:p-12 space-y-8 lg:space-y-12" onSubmit={e => e.preventDefault()}>
 
-                  {/* ── Step 1 ── */}
+                  {/* ── Step 1: Founder Identity ── */}
                   {currentStep === 0 && (
                     <section className="space-y-5 animate-fade-in">
                       <div>
@@ -971,11 +1142,16 @@ export default function ApplyPage() {
                         <label className="label-style mb-1 block">
                           Mobile <span className="text-forest/30 font-normal">(optional)</span>
                         </label>
-                        <div className="flex gap-2">
+                        <div className="grid grid-cols-2 gap-2">
                           <PhoneCountryDropdown value={dialCountry} onChange={handleDialChange} countries={countries} loading={countriesLoading} />
                           <input type="tel" id="mobile" autoComplete="tel-national"
-                            className={`input-field flex-1 ${fieldCls("mobile")}`}
-                            placeholder={dialCountry === "IN" ? "98765 43210" : dialCountry === "US" ? "(555) 123-4567" : dialCountry === "GB" ? "07700 900123" : "Enter number"}
+                            className={`input-field ${fieldCls("mobile")}`}
+                            placeholder={
+                              dialCountry === "IN" ? "98765 43210"
+                              : dialCountry === "US" ? "(555) 123-4567"
+                              : dialCountry === "GB" ? "07700 900123"
+                              : "Enter number"
+                            }
                             value={form.mobile} onChange={handleChange} />
                         </div>
                         <FieldError msg={errs.mobile} />
@@ -984,7 +1160,14 @@ export default function ApplyPage() {
                         {countryAutoFilled && dialCountry && selectedCountry && (
                           <div className="flex items-center gap-1.5 mt-1.5">
                             <CheckCircle className="w-3 h-3 text-green-600 flex-shrink-0" />
-                            <img src={selectedCountry.flag} alt={selectedCountry.name} className="w-4 h-3 object-cover rounded-sm" />
+                            <Image
+                              src={selectedCountry.flag}
+                              alt={selectedCountry.name}
+                              width={16}
+                              height={12}
+                              style={{ width: 16, height: 12 }}
+                              className="object-cover rounded-sm"
+                            />
                             <p className="text-[10px] text-forest/50">
                               Auto-detected: <span className="font-medium text-forest/70">{selectedCountry.name}</span>
                             </p>
@@ -995,7 +1178,7 @@ export default function ApplyPage() {
                     </section>
                   )}
 
-                  {/* ── Step 2 ── */}
+                  {/* ── Step 2: Core Concept ── */}
                   {currentStep === 1 && (
                     <section className="space-y-5 animate-fade-in">
                       <div>
@@ -1016,12 +1199,15 @@ export default function ApplyPage() {
                       </div>
 
                       <div>
-                        <label className="label-style" htmlFor="sector">Primary Industry <span className="text-red-400">*</span></label>
-                        <select id="sector" className={`input-field appearance-none cursor-pointer ${fieldCls("sector")}`}
-                          value={form.sector} onChange={handleChange}>
-                          <option value="">Select Industry</option>
-                          {industryOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                        </select>
+                        <label className="label-style mb-1 block">Primary Industry <span className="text-red-400">*</span></label>
+                        <IndustryDropdown
+                          value={form.sector}
+                          onChange={v => {
+                            setForm(prev => ({ ...prev, sector: v }));
+                            applyResult("sector", validate("sector", v));
+                          }}
+                          hasError={!!errs.sector}
+                        />
                         <FieldError msg={errs.sector} />
                       </div>
 
@@ -1030,7 +1216,10 @@ export default function ApplyPage() {
                         <div className="flex flex-wrap gap-2 mt-2">
                           {stages.map(s => (
                             <label key={s} className={`flex items-center gap-2 px-3 py-2.5 border rounded-lg cursor-pointer transition-all ${form.stage === s ? "bg-forest text-white border-forest shadow-sm" : "bg-beige/50 border-forest/10 hover:bg-beige"}`}>
-                              <input type="radio" name="stage" value={s} checked={form.stage === s} onChange={() => setForm(p => ({ ...p, stage: s }))} className="sr-only" />
+                              <input type="radio" name="stage" value={s} checked={form.stage === s}
+                                // FIX: cast s to StageLabel so TypeScript accepts it
+                                onChange={() => setForm(p => ({ ...p, stage: s as StageLabel }))}
+                                className="sr-only" />
                               <span className={`text-xs font-bold uppercase tracking-widest ${form.stage === s ? "text-white" : "text-forest/70"}`}>{s}</span>
                             </label>
                           ))}
@@ -1070,7 +1259,7 @@ export default function ApplyPage() {
                     </section>
                   )}
 
-                  {/* ── Step 3 ── */}
+                  {/* ── Step 3: Impact Resonance ── */}
                   {currentStep === 2 && (
                     <section className="space-y-5 animate-fade-in">
                       <div>
@@ -1105,7 +1294,7 @@ export default function ApplyPage() {
                     </section>
                   )}
 
-                  {/* ── Step 4 ── */}
+                  {/* ── Step 4: Capital Needs ── */}
                   {currentStep === 3 && (
                     <section className="space-y-5 animate-fade-in">
                       <div>
@@ -1124,15 +1313,12 @@ export default function ApplyPage() {
                               applyResult("capitalRequested", validate("capitalRequested", v));
                             }}
                             onCurrencyChange={code => {
-                              // Only accept codes from the allowlist
                               if (VALID_CURRENCY_CODES.has(code)) setCapitalCurrency(code);
                             }}
                             hasWarning={!!warns.capitalRequested}
                           />
                           <FieldWarn msg={warns.capitalRequested} />
-                          <p className="text-[10px] text-forest/30 mt-1">
-                            Currency auto-set from region · change freely
-                          </p>
+                          <p className="text-[10px] text-forest/30 mt-1">Currency auto-set from region · change freely</p>
                         </div>
 
                         <div>
@@ -1165,7 +1351,7 @@ export default function ApplyPage() {
                     </section>
                   )}
 
-                  {/* ── Step 5 ── */}
+                  {/* ── Step 5: The Collective ── */}
                   {currentStep === 4 && (
                     <section className="space-y-5 animate-fade-in">
                       <div>
@@ -1190,7 +1376,7 @@ export default function ApplyPage() {
                     </section>
                   )}
 
-                  {/* Nav row */}
+                  {/* ── Navigation row ── */}
                   <div className="pt-6 border-t border-forest/10 flex items-center justify-between gap-3">
                     <button type="button" onClick={handleSaveProgress}
                       className="text-xs font-bold uppercase tracking-widest text-forest/40 hover:text-forest transition-colors flex items-center gap-1.5 py-2 flex-shrink-0">
@@ -1212,7 +1398,10 @@ export default function ApplyPage() {
                       ) : (
                         <button type="button" onClick={handleSubmit} disabled={isSubmitting}
                           className="flex items-center gap-2 px-6 py-3 bg-forest text-white font-bold uppercase text-xs tracking-[0.15em] hover:bg-forest/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-sm shadow-forest/10">
-                          {isSubmitting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Submitting…</> : "Submit Application"}
+                          {isSubmitting
+                            ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Submitting…</>
+                            : "Submit Application"
+                          }
                         </button>
                       )}
                     </div>

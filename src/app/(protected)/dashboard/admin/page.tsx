@@ -14,7 +14,7 @@ const stats = [
     sub: "12 pending",
     icon: <Rocket className="h-4 w-4" />,
     trend: "+8",
-    accent: "#1A362B",
+    accent: "#61cca1",
   },
   {
     label: "Investors",

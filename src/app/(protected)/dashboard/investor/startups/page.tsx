@@ -136,9 +136,9 @@ export default async function DiscoverPage() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "24px" }}>
             {startups.map((startup, i) => {
               const leadFounder = (startup.founders as FounderEntry[])?.find((f) => f.isLeadFounder)
-              const askMin = formatAmount(startup.fundingAskMin?.toString())
-              const askMax = formatAmount(startup.fundingAskMax?.toString())
-              const fundingRange = askMin && askMax ? `${askMin} – ${askMax}` : askMin ?? askMax ?? null
+              // const askMin = formatAmount(startup.fundingAskMin?.toString())
+              // const askMax = formatAmount(startup.fundingAskMax?.toString())
+              // const fundingRange = askMin && askMax ? `${askMin} – ${askMax}` : askMin ?? askMax ?? null
               const accentColor = sectorColor(startup.sector)
 
               return (
@@ -194,12 +194,12 @@ export default async function DiscoverPage() {
                       )}
                     </div>
 
-                    {fundingRange && (
+                    {/* {fundingRange && (
                       <div style={{ marginBottom: "16px" }}>
                         <p style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "rgba(26,54,43,0.35)", marginBottom: "3px" }}>Raising</p>
                         <p style={{ fontSize: "15px", fontWeight: 600, color: "var(--forest)" }}>{fundingRange}</p>
                       </div>
-                    )}
+                    )} */}
 
                     {leadFounder && (
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", paddingTop: "12px", borderTop: "1px solid rgba(26,54,43,0.06)" }}>
