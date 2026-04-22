@@ -316,8 +316,8 @@ export const StartupProfilesTable = pgTable(
     growthRate: decimal("growth_rate", { precision: 5, scale: 2 }),
 
     // Funding ask
-    fundingAskMin: decimal("funding_ask_min", { precision: 15, scale: 2 }),
-    fundingAskMax: decimal("funding_ask_max", { precision: 15, scale: 2 }),
+    // fundingAskMin: decimal("funding_ask_min", { precision: 15, scale: 2 }),
+    // fundingAskMax: decimal("funding_ask_max", { precision: 15, scale: 2 }),
     equityOffered: decimal("equity_offered", { precision: 5, scale: 2 }),
     useOfFunds: text("use_of_funds"),
     fundingDeadline: timestamp("funding_deadline", { mode: "date" }),
@@ -348,10 +348,10 @@ export const StartupProfilesTable = pgTable(
     // Approval queue
     index("startup_profiles_approval_status_idx").on(t.approvalStatus),
     // Funding range slider
-    index("startup_profiles_funding_ask_idx").on(
-      t.fundingAskMin,
-      t.fundingAskMax
-    ),
+    // index("startup_profiles_funding_ask_idx").on(
+    //   t.fundingAskMin,
+    //   t.fundingAskMax
+    // ),
     // Featured page — partial (only ~N rows, stays tiny)
     index("startup_profiles_featured_idx")
       .on(t.featuredUntil)

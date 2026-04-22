@@ -90,7 +90,7 @@ export default async function StartupDetailPage({ params }: PageProps) {
   const founders = (startup.founders as FounderEntry[]) ?? []
   const sdgGoals = (startup.sdgGoals as number[]) ?? []
   const hasRevenue = startup.revenueMonthly !== null || startup.revenueAnnual !== null
-  const hasFunding = startup.fundingAskMin !== null || startup.fundingAskMax !== null
+  // const hasFunding = startup.fundingAskMin !== null || startup.fundingAskMax !== null
 
   const fmtUsd = (v: string | null | undefined) =>
     v ? `$${Number(v).toLocaleString()}` : null
@@ -194,7 +194,7 @@ export default async function StartupDetailPage({ params }: PageProps) {
           </>
         )}
 
-        {/* FUNDING */}
+        {/* FUNDING
         {hasFunding && (
           <>
             <div className="border-t border-forest/10" />
@@ -215,7 +215,7 @@ export default async function StartupDetailPage({ params }: PageProps) {
               )}
             </section>
           </>
-        )}
+        )} */}
 
         {/* IMPACT */}
         {(startup.impactDescription || sdgGoals.length > 0) && (

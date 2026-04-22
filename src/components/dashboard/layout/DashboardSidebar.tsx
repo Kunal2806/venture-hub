@@ -273,10 +273,10 @@ export default function DashboardSidebar({
     <aside
       className={cn(
         "w-64 bg-card border-r border-border flex flex-col",
-        // Desktop: always visible, full height
-        "hidden lg:flex lg:min-h-[calc(100vh-4rem)]",
+        // Desktop: sticky, stays fixed while content scrolls
+        "hidden lg:flex lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)]",
         // Mobile: fixed overlay
-        "lg:relative lg:translate-x-0 lg:shadow-none"
+        "lg:shadow-none"
       )}
     >
       <SidebarInner

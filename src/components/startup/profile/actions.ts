@@ -168,8 +168,8 @@ const TractionSchema = z.object({
       "Must be a positive integer"
     ),
   growthRate: positiveDecimal,
-  fundingAskMin: positiveDecimal,
-  fundingAskMax: positiveDecimal,
+  // fundingAskMin: positiveDecimal,
+  // fundingAskMax: positiveDecimal,
   equityOffered: z
     .string()
     .optional()
@@ -190,8 +190,8 @@ export async function updateTraction(
     revenueAnnual: formData.get("revenueAnnual"),
     userCount: formData.get("userCount"),
     growthRate: formData.get("growthRate"),
-    fundingAskMin: formData.get("fundingAskMin"),
-    fundingAskMax: formData.get("fundingAskMax"),
+    // fundingAskMin: formData.get("fundingAskMin"),
+    // fundingAskMax: formData.get("fundingAskMax"),
     equityOffered: formData.get("equityOffered"),
     useOfFunds: formData.get("useOfFunds"),
   };
@@ -201,7 +201,8 @@ export async function updateTraction(
     return { success: false, message: parsed.error.errors[0]?.message ?? "Validation failed." };
   }
 
-  const { profileId, userId, userCount, revenueMonthly, revenueAnnual, growthRate, fundingAskMin, fundingAskMax, equityOffered, useOfFunds } = parsed.data;
+  // const { profileId, userId, userCount, revenueMonthly, revenueAnnual, growthRate, fundingAskMin, fundingAskMax, equityOffered, useOfFunds } = parsed.data;
+  const { profileId, userId, userCount, revenueMonthly, revenueAnnual, growthRate, equityOffered, useOfFunds } = parsed.data;
 
   const ownership = await verifyOwnership(profileId, userId);
   if (!ownership.ok) return { success: false, message: ownership.error! };
@@ -214,8 +215,8 @@ export async function updateTraction(
         revenueAnnual: revenueAnnual || null,
         userCount: userCount ? parseInt(userCount) : null,
         growthRate: growthRate || null,
-        fundingAskMin: fundingAskMin || null,
-        fundingAskMax: fundingAskMax || null,
+        // fundingAskMin: fundingAskMin || null,
+        // fundingAskMax: fundingAskMax || null,
         equityOffered: equityOffered || null,
         useOfFunds: useOfFunds || null,
         updatedAt: new Date(),

@@ -34,7 +34,7 @@ export function calculateProfileScore(profile: Partial<StartupProfile>): ScoreBr
   if (profile.userCount) traction += 5;
   if (profile.revenueMonthly || profile.revenueAnnual) traction += 5;
   if (profile.growthRate) traction += 4;
-  if (profile.fundingAskMin) traction += 3;
+  // if (profile.fundingAskMin) traction += 3;
   if (profile.equityOffered) traction += 3;
 
   // --- Founders (20 pts) ---

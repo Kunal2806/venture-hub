@@ -33,8 +33,8 @@ export type TractionData = {
   revenueAnnual: string;
   userCount: string;
   growthRate: string;
-  fundingAskMin: string;
-  fundingAskMax: string;
+  // fundingAskMin: string;
+  // fundingAskMax: string;
   equityOffered: string;
   useOfFunds: string;
 };

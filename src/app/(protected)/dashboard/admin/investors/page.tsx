@@ -164,18 +164,28 @@ export default function InvestorApplicationsPage() {
   const openDrawer  = (app: Application) => { setSelected(app); setDrawerOpen(true); };
   const closeDrawer = () => { setDrawerOpen(false); setTimeout(() => setSelected(null), 300); };
 
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const handleAction = async (
     app: Application,
     action: "approve" | "reject" | "under_review",
     notes: string
   ) => {
+    setActionError(null);
     startTransition(async () => {
       const res = await fetch("/api/admin/investor-applications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: app.id, action, reviewNotes: notes }),
       });
-      if (res.ok) { closeDrawer(); fetchApplications(); fetchCounts(); }
+      if (res.ok) {
+        closeDrawer();
+        fetchApplications();
+        fetchCounts();
+      } else {
+        const json = await res.json().catch(() => ({}));
+        setActionError(json.error || `Request failed (${res.status})`);
+      }
     });
   };
 
