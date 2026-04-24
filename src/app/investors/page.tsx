@@ -4,7 +4,7 @@ import { Footer } from "@/components/home/Footer";
 import { Navigation } from "@/components/home/Navigation";
 import {
   AlertCircle, CheckCircle, ChevronDown, ChevronLeft,
-  ChevronRight, Loader2, Save, Search, X,
+  ChevronRight, Eye, EyeOff, Loader2, Save, Search, X,
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -107,7 +107,7 @@ const TZ_TO_CC: Record<string, string> = {
   "Europe/Warsaw": "PL", "Europe/Zurich": "CH", "Pacific/Auckland": "NZ",
 };
 
-// ─── Currency data (mirrored from startup form) ────────────────────────────────
+// ─── Currency data ────────────────────────────────────────────────────────────
 
 const CURRENCIES = [
   { code: "USD", symbol: "$",    name: "US Dollar" },
@@ -148,9 +148,8 @@ const CURRENCIES = [
 
 const VALID_CURRENCY_CODES = new Set(CURRENCIES.map(c => c.code));
 
-// Per-currency max ticket
 const MAX_TICKET_BY_CURRENCY: Record<string, number> = {
-  INR:     990_000_000, // 99 crore
+  INR:     990_000_000,
   USD:     100_000_000,
   EUR:     100_000_000,
   GBP:     100_000_000,
@@ -168,8 +167,6 @@ function formatTicketAmount(raw: string, currencyCode: string): string {
   if (isNaN(num)) return "";
   const max = MAX_TICKET_BY_CURRENCY[currencyCode] ?? MAX_TICKET_BY_CURRENCY.DEFAULT;
   const clamped = Math.min(num, max);
-
-  // Indian comma formatting for INR
   if (currencyCode === "INR") {
     const s = clamped.toString();
     if (s.length <= 3) return s;
@@ -182,6 +179,16 @@ function formatTicketAmount(raw: string, currencyCode: string): string {
 
 function parseTicketAmount(formatted: string): number {
   return Number(formatted.replace(/,/g, ""));
+}
+
+// ─── Password validation (mirrors API rules) ───────────────────────────────────
+
+function validatePasswordValue(password: string): string | null {
+  if (password.length < 8)             return "At least 8 characters required.";
+  if (!/[a-z]/.test(password))         return "Needs a lowercase letter.";
+  if (!/[0-9]/.test(password))         return "Needs a number.";
+  if (!/[^A-Za-z0-9]/.test(password))  return "Needs a special character.";
+  return null;
 }
 
 // ─── Micro-components ──────────────────────────────────────────────────────────
@@ -224,14 +231,38 @@ function CharCount({ cur, max }: { cur: number; max: number }) {
   );
 }
 
+// ─── Password strength meter ───────────────────────────────────────────────────
+
+function PasswordStrength({ password }: { password: string }) {
+  if (!password) return null;
+  const checks = [
+    password.length >= 8,
+    /[a-z]/.test(password),
+    /[0-9]/.test(password),
+    /[^A-Za-z0-9]/.test(password),
+    password.length >= 12,
+  ];
+  const score = checks.filter(Boolean).length;
+  const label = score <= 1 ? "Weak" : score <= 3 ? "Fair" : score === 4 ? "Good" : "Strong";
+  const color = score <= 1 ? "bg-red-400" : score <= 3 ? "bg-amber-400" : score === 4 ? "bg-green-500" : "bg-green-600";
+  return (
+    <div className="mt-2">
+      <div className="flex gap-1 mb-1">
+        {[1,2,3,4,5].map(i => (
+          <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-300 ${i <= score ? color : "bg-forest/10"}`} />
+        ))}
+      </div>
+      <p className={`text-[10px] font-medium ${score <= 1 ? "text-red-500" : score <= 3 ? "text-amber-500" : "text-green-600"}`}>{label}</p>
+    </div>
+  );
+}
+
 // ─── Tooltip ──────────────────────────────────────────────────────────────────
 
 function Tooltip({ text }: { text: string }) {
   return (
     <span className="relative group inline-flex items-center ml-2 cursor-help">
-      <span className="w-5 h-5 rounded-full bg-forest/10 text-forest/50 text-[11px] font-bold flex items-center justify-center select-none hover:bg-forest/20 transition-colors">
-        ?
-      </span>
+      <span className="w-5 h-5 rounded-full bg-forest/10 text-forest/50 text-[11px] font-bold flex items-center justify-center select-none hover:bg-forest/20 transition-colors">?</span>
       <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 rounded-xl bg-forest text-white text-[11px] leading-relaxed px-3 py-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50 shadow-xl whitespace-normal text-left">
         {text}
       </span>
@@ -244,7 +275,7 @@ function Tooltip({ text }: { text: string }) {
 function validate(
   id: string,
   value: string,
-  ctx: { dialCountry?: string; currency?: string } = {}
+  ctx: { dialCountry?: string; currency?: string; confirmPassword?: string; password?: string } = {}
 ): VResult {
   switch (id) {
     case "name":
@@ -266,6 +297,19 @@ function validate(
       if (FREE_EMAIL_DOMAINS.includes(domain))
         return { warning: "A professional email builds more trust with startups" };
       return { success: "Valid email" };
+    }
+
+    case "password": {
+      if (!value) return { error: "Password is required" };
+      const err = validatePasswordValue(value);
+      if (err) return { error: err };
+      return { success: "Password looks strong" };
+    }
+
+    case "confirmPassword": {
+      if (!value) return { error: "Please confirm your password" };
+      if (value !== ctx.password) return { error: "Passwords do not match" };
+      return { success: "Passwords match" };
     }
 
     case "mobile": {
@@ -519,8 +563,7 @@ function MultiToggle({ options, selected, onChange }: {
   );
 }
 
-// ─── Ticket Amount Input — currency selector + amount field ───────────────────
-// Mirrors the startup form's CapitalInput exactly
+// ─── Ticket Amount Input ──────────────────────────────────────────────────────
 
 function TicketAmountInput({
   amount, currency, onAmountChange, onCurrencyChange,
@@ -564,7 +607,6 @@ function TicketAmountInput({
 
   function handleCurrencySelect(code: string) {
     onCurrencyChange(code);
-    // Re-format amount under new currency's max
     if (amount) onAmountChange(formatTicketAmount(amount, code));
     setOpen(false);
     setSearch("");
@@ -574,7 +616,6 @@ function TicketAmountInput({
     <div className={`flex border rounded-lg transition-colors bg-white ${
       hasError ? "border-red-300 bg-red-50/30" : hasWarning ? "border-amber-300" : "border-forest/15"
     }`}>
-      {/* Currency selector button */}
       <div className="relative flex-shrink-0 border-r border-forest/10" ref={ref}>
         <button type="button" onClick={() => setOpen(o => !o)}
           className="flex items-center gap-1.5 px-3 h-full py-2.5 text-sm font-semibold text-forest hover:bg-forest/4 transition-colors whitespace-nowrap rounded-l-[7px]">
@@ -582,7 +623,6 @@ function TicketAmountInput({
           <span className="text-xs text-forest/55">{curr.code}</span>
           <ChevronDown className={`w-3 h-3 text-forest/35 transition-transform ${open ? "rotate-180" : ""}`} />
         </button>
-
         {open && (
           <div className="absolute left-0 top-full mt-1.5 w-64 bg-white border border-forest/12 rounded-xl shadow-2xl z-[100] overflow-hidden">
             <div className="flex items-center gap-2 px-3 py-2.5 border-b border-forest/8 bg-forest/2">
@@ -609,8 +649,6 @@ function TicketAmountInput({
           </div>
         )}
       </div>
-
-      {/* Amount field */}
       <input type="text" inputMode="numeric"
         className="flex-1 px-3 py-2.5 text-sm text-forest bg-transparent outline-none placeholder-forest/30 min-w-0"
         placeholder={placeholder}
@@ -632,12 +670,15 @@ export default function InvestorApplyPage() {
   const [isClient, setIsClient] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
+  // Password visibility toggles
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [countries, setCountries] = useState<CountryData[]>([]);
   const [countriesLoading, setCountriesLoading] = useState(true);
   const [dialCountry, setDialCountry] = useState("");
   const [countryAutoFilled, setCountryAutoFilled] = useState(false);
 
-  // Shared currency for both min + max ticket — auto-set from phone country
   const [ticketCurrency, setTicketCurrency] = useState("USD");
 
   const [errs,  setErrs]  = useState<Record<string, string>>({});
@@ -647,6 +688,8 @@ export default function InvestorApplyPage() {
   const [form, setForm] = useState({
     name:                 "",
     email:                "",
+    password:             "",
+    confirmPassword:      "",
     mobile:               "",
     firmName:             "",
     designation:          "",
@@ -701,6 +744,7 @@ export default function InvestorApplyPage() {
         preferredStages:      Array.isArray(p.preferredStages)      ? p.preferredStages       : prev.preferredStages,
         preferredGeographies: Array.isArray(p.preferredGeographies) ? p.preferredGeographies  : prev.preferredGeographies,
         impactFocused:        typeof p.impactFocused    === "boolean" ? p.impactFocused         : prev.impactFocused,
+        // NOTE: passwords are intentionally NOT restored from draft for security
       }));
       if (typeof p.dialCountry === "string" && p.dialCountry) setDialCountry(p.dialCountry);
       if (typeof p.ticketCurrency === "string" && VALID_CURRENCY_CODES.has(p.ticketCurrency))
@@ -750,7 +794,19 @@ export default function InvestorApplyPage() {
     const v = typeof limit === "number" ? value.slice(0, limit) : value;
     setForm(prev => ({ ...prev, [id]: v }));
     setSubmitError(null);
-    applyResult(id, validate(id, v, { dialCountry, currency: ticketCurrency }));
+
+    // Special cross-field validation for confirm password
+    if (id === "password") {
+      applyResult(id, validate(id, v));
+      // Re-validate confirm if already filled
+      if (form.confirmPassword) {
+        applyResult("confirmPassword", validate("confirmPassword", form.confirmPassword, { password: v }));
+      }
+    } else if (id === "confirmPassword") {
+      applyResult(id, validate(id, v, { password: form.password }));
+    } else {
+      applyResult(id, validate(id, v, { dialCountry, currency: ticketCurrency }));
+    }
   }
 
   function handleDialChange(cc: string) {
@@ -759,11 +815,9 @@ export default function InvestorApplyPage() {
       const found = countries.find(c => c.code === cc);
       if (found) {
         setForm(prev => ({ ...prev, country: found.name }));
-        // Update currency when phone country changes
         if (found.currency && VALID_CURRENCY_CODES.has(found.currency)) {
           const newCurrency = found.currency;
           setTicketCurrency(newCurrency);
-          // Re-format + re-validate ticket fields under new currency
           if (form.ticketSizeMin) {
             const fmt = formatTicketAmount(form.ticketSizeMin, newCurrency);
             setForm(prev => ({ ...prev, ticketSizeMin: fmt }));
@@ -784,7 +838,6 @@ export default function InvestorApplyPage() {
     if (form.mobile.trim()) applyResult("mobile", validate("mobile", form.mobile, { dialCountry: cc }));
   }
 
-  // When user manually changes currency in the ticket input
   function handleCurrencyChange(code: string) {
     if (!VALID_CURRENCY_CODES.has(code)) return;
     setTicketCurrency(code);
@@ -800,9 +853,9 @@ export default function InvestorApplyPage() {
     }
   }
 
-  // ── Step field maps ─────────────────────────────────────────────────────────
+  // ── Step field maps — now includes password fields in step 0 ────────────────
   const STEP_FIELDS: Record<number, string[]> = {
-    0: ["name", "email", "mobile"],
+    0: ["name", "email", "password", "confirmPassword", "mobile"],
     1: ["investorType", "firmName", "designation", "websiteUrl", "linkedinUrl"],
     2: ["investmentThesis"],
     3: ["ticketSizeMin", "ticketSizeMax"],
@@ -816,6 +869,21 @@ export default function InvestorApplyPage() {
 
   function validateStep(step: number): boolean {
     let ok = true;
+    if (step === 0) {
+      // Cross-field: confirm password matches
+      const pwErr = validatePasswordValue(form.password);
+      if (pwErr) { applyResult("password", { error: pwErr }); ok = false; }
+      else applyResult("password", { success: "Password looks strong" });
+      if (form.confirmPassword !== form.password) {
+        applyResult("confirmPassword", { error: "Passwords do not match" });
+        ok = false;
+      } else if (form.confirmPassword) {
+        applyResult("confirmPassword", { success: "Passwords match" });
+      } else {
+        applyResult("confirmPassword", { error: "Please confirm your password" });
+        ok = false;
+      }
+    }
     if (step === 3) {
       const min = parseTicketAmount(form.ticketSizeMin);
       const max = parseTicketAmount(form.ticketSizeMax);
@@ -825,6 +893,8 @@ export default function InvestorApplyPage() {
       }
     }
     for (const id of (STEP_FIELDS[step] ?? [])) {
+      // Skip password fields here — handled above with cross-field logic
+      if (step === 0 && (id === "password" || id === "confirmPassword")) continue;
       const v = getStringField(id);
       const r = validate(id, v, { dialCountry, currency: ticketCurrency });
       applyResult(id, r);
@@ -835,17 +905,13 @@ export default function InvestorApplyPage() {
 
   function validateAll(): boolean {
     let ok = true;
-    for (const ids of Object.values(STEP_FIELDS)) {
-      for (const id of ids) {
-        const v = getStringField(id);
-        const r = validate(id, v, { dialCountry, currency: ticketCurrency });
-        applyResult(id, r);
-        if (r.error) ok = false;
-      }
+    for (let step = 0; step < steps.length; step++) {
+      if (!validateStep(step)) ok = false;
     }
     return ok;
   }
 
+  // Passwords intentionally excluded from draft
   const saveDraft = () => {
     try {
       const payload = {
@@ -896,34 +962,51 @@ export default function InvestorApplyPage() {
         catch { formattedPhone = form.mobile; }
       }
       const safeCurrency = VALID_CURRENCY_CODES.has(ticketCurrency) ? ticketCurrency : "USD";
-      const res = await fetch("/api/investors/apply", {
+
+      // ── Updated: POST to the public investor creation route ──
+      const res = await fetch("/api/investors/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: form.name, email: form.email,
-          mobile: formattedPhone || undefined,
-          firmName: form.firmName || undefined, designation: form.designation || undefined,
-          investorType: form.investorType || undefined, bio: form.bio || undefined,
-          websiteUrl: form.websiteUrl || undefined, linkedinUrl: form.linkedinUrl || undefined,
-          country: form.country || undefined, city: form.city || undefined,
-          preferredSectors: form.preferredSectors, preferredStages: form.preferredStages,
-          preferredGeographies: form.preferredGeographies, impactFocused: form.impactFocused,
-          investmentThesis: form.investmentThesis || undefined,
-          ticketSizeMin: form.ticketSizeMin || undefined,
-          ticketSizeMax: form.ticketSizeMax || undefined,
-          ticketCurrency: safeCurrency,
+          name:                 form.name,
+          email:                form.email,
+          password:             form.password,          // ← now sent from user
+          mobile:               formattedPhone || undefined,
+          firmName:             form.firmName || undefined,
+          designation:          form.designation || undefined,
+          investorType:         form.investorType || undefined,
+          bio:                  form.bio || undefined,
+          websiteUrl:           form.websiteUrl || undefined,
+          linkedinUrl:          form.linkedinUrl || undefined,
+          country:              form.country || undefined,
+          city:                 form.city || undefined,
+          preferredSectors:     form.preferredSectors,
+          preferredStages:      form.preferredStages,
+          preferredGeographies: form.preferredGeographies,
+          impactFocused:        form.impactFocused,
+          investmentThesis:     form.investmentThesis || undefined,
+          ticketSizeMin:        form.ticketSizeMin || undefined,
+          ticketSizeMax:        form.ticketSizeMax || undefined,
+          ticketCurrency:       safeCurrency,
         }),
       });
+
       const data = await res.json();
       if (!res.ok) {
         if (res.status === 429) throw new Error("Too many requests. Please wait a moment and try again.");
-        if (res.status === 409) throw new Error("An application with this email already exists.");
-        if (res.status === 400 && data.details && Array.isArray(data.details)) {
-          throw new Error(data.details.map((d: { field: string; message: string }) => d.field ? `${d.field}: ${d.message}` : d.message).join("\n"));
+        if (res.status === 409) throw new Error("An account with this email already exists.");
+        if (res.status === 422 && data.errors) {
+          const msgs = Object.values(data.errors as Record<string, string>).join("\n");
+          throw new Error(msgs);
         }
-        throw new Error(data.error || "Something went wrong. Please try again.");
+        throw new Error(data.message || "Something went wrong. Please try again.");
       }
-      try { sessionStorage.removeItem("vh-investor-apply-draft"); localStorage.removeItem("vh-investor-apply-draft"); } catch {}
+
+      try {
+        sessionStorage.removeItem("vh-investor-apply-draft");
+        localStorage.removeItem("vh-investor-apply-draft");
+      } catch {}
+
       router.push("/investors/success");
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Something went wrong");
@@ -977,9 +1060,9 @@ export default function InvestorApplyPage() {
 
             {/* Desktop sidebar */}
             <aside className="hidden lg:block lg:col-span-4 lg:sticky lg:top-24 h-fit">
-              <span className="text-forest/40 font-bold uppercase tracking-[0.4em] text-[10px] block mb-4">Investor Application</span>
+              <span className="text-forest/40 font-bold uppercase tracking-[0.4em] text-[10px] block mb-4">Investor Registration</span>
               <h1 className="font-serif text-5xl lg:text-6xl text-forest mb-8 leading-tight">Back the <span className="italic">builders.</span></h1>
-              <p className="text-forest/70 text-lg leading-relaxed mb-12 max-w-sm">Apply to join VentureHub's curated investor community. No password needed — we'll set up your account once your application is approved.</p>
+              <p className="text-forest/70 text-lg leading-relaxed mb-12 max-w-sm">Join VentureHub's curated investor community. Create your account and start connecting with founders today.</p>
               <nav className="space-y-7 relative">
                 <div className="absolute left-[7px] top-2 bottom-2 w-px bg-forest/10" />
                 {steps.map(({ num, title, sub }, i) => (
@@ -997,7 +1080,7 @@ export default function InvestorApplyPage() {
             {/* Mobile title */}
             <div className="lg:hidden col-span-1 mb-5 px-1">
               <h1 className="font-serif text-3xl text-forest leading-tight">Back the <span className="italic">builders.</span></h1>
-              <p className="text-forest/60 text-sm mt-1.5 leading-relaxed">Apply to join VentureHub's investor community.</p>
+              <p className="text-forest/60 text-sm mt-1.5 leading-relaxed">Join VentureHub's investor community.</p>
             </div>
 
             {/* Form */}
@@ -1021,8 +1104,10 @@ export default function InvestorApplyPage() {
                     <section className="space-y-5 animate-fade-in">
                       <div>
                         <h2 className="font-serif text-2xl lg:text-3xl text-forest">Identity</h2>
-                        <p className="text-sm text-forest/50 mt-1">Tell us who you are. No password needed — we'll create your account once approved.</p>
+                        <p className="text-sm text-forest/50 mt-1">Tell us who you are and create your account credentials.</p>
                       </div>
+
+                      {/* Name */}
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <label className="label-style" htmlFor="name">Full Name <span className="text-red-400">*</span></label>
@@ -1033,13 +1118,69 @@ export default function InvestorApplyPage() {
                         <FieldError msg={errs.name} /><FieldOk msg={oks.name} />
                         <p className="text-[10px] text-forest/30 mt-1">Letters, spaces, hyphens, apostrophes · 2–{INVESTOR_CHAR_LIMITS.name} chars</p>
                       </div>
+
+                      {/* Email */}
                       <div>
                         <label className="label-style" htmlFor="email">Email Address <span className="text-red-400">*</span></label>
                         <input type="email" id="email" autoComplete="email"
                           className={`input-field ${fieldCls("email")}`} placeholder="jordan@meridianvc.com" value={form.email} onChange={handleChange} />
                         <FieldError msg={errs.email} /><FieldWarn msg={warns.email} /><FieldOk msg={oks.email} />
-                        <p className="text-[10px] text-forest/30 mt-1">Your account will be created at this address once approved.</p>
+                        <p className="text-[10px] text-forest/30 mt-1">This will be your login email address.</p>
                       </div>
+
+                      {/* Password */}
+                      <div>
+                        <label className="label-style" htmlFor="password">Password <span className="text-red-400">*</span></label>
+                        <div className="relative">
+                          <input
+                            type={showPassword ? "text" : "password"}
+                            id="password"
+                            autoComplete="new-password"
+                            className={`input-field pr-10 ${fieldCls("password")}`}
+                            placeholder="Create a strong password"
+                            value={form.password}
+                            onChange={handleChange}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(v => !v)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-forest/30 hover:text-forest/60 transition-colors"
+                            tabIndex={-1}
+                          >
+                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                        <PasswordStrength password={form.password} />
+                        <FieldError msg={errs.password} /><FieldOk msg={oks.password} />
+                        <p className="text-[10px] text-forest/30 mt-1">Min 8 chars · lowercase · number · special character</p>
+                      </div>
+
+                      {/* Confirm Password */}
+                      <div>
+                        <label className="label-style" htmlFor="confirmPassword">Confirm Password <span className="text-red-400">*</span></label>
+                        <div className="relative">
+                          <input
+                            type={showConfirmPassword ? "text" : "password"}
+                            id="confirmPassword"
+                            autoComplete="new-password"
+                            className={`input-field pr-10 ${fieldCls("confirmPassword")}`}
+                            placeholder="Repeat your password"
+                            value={form.confirmPassword}
+                            onChange={handleChange}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword(v => !v)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-forest/30 hover:text-forest/60 transition-colors"
+                            tabIndex={-1}
+                          >
+                            {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                        <FieldError msg={errs.confirmPassword} /><FieldOk msg={oks.confirmPassword} />
+                      </div>
+
+                      {/* Mobile */}
                       <div>
                         <label className="label-style mb-1 block">Mobile <span className="text-forest/30 font-normal">(optional)</span></label>
                         <div className="grid grid-cols-2 gap-2">
@@ -1229,8 +1370,6 @@ export default function InvestorApplyPage() {
                         </h2>
                         <p className="text-sm text-forest/50 mt-1">Set your capital deployment parameters.</p>
                       </div>
-
-                      {/* Auto-set currency notice */}
                       {countryAutoFilled && (
                         <div className="flex items-center gap-2 p-3 bg-forest/5 rounded-xl border border-forest/8">
                           <CheckCircle className="w-3.5 h-3.5 text-forest/40 flex-shrink-0" />
@@ -1239,7 +1378,6 @@ export default function InvestorApplyPage() {
                           </p>
                         </div>
                       )}
-
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="label-style mb-1.5 block">Minimum Ticket</label>
@@ -1288,7 +1426,6 @@ export default function InvestorApplyPage() {
                           <FieldError msg={errs.ticketSizeMax} /><FieldWarn msg={warns.ticketSizeMax} /><FieldOk msg={oks.ticketSizeMax} />
                         </div>
                       </div>
-
                       {form.ticketSizeMin && form.ticketSizeMax && !errs.ticketSizeMin && !errs.ticketSizeMax && (
                         <p className="text-[10px] text-forest/40">
                           Range: <span className="font-semibold text-forest/60">{currObj.symbol}{form.ticketSizeMin} – {currObj.symbol}{form.ticketSizeMax} {ticketCurrency}</span>
@@ -1303,12 +1440,13 @@ export default function InvestorApplyPage() {
                     <section className="space-y-6 animate-fade-in">
                       <div>
                         <h2 className="font-serif text-2xl lg:text-3xl text-forest">Review & Submit</h2>
-                        <p className="text-sm text-forest/50 mt-1">Confirm your details. Our team will review and be in touch within 3–5 days.</p>
+                        <p className="text-sm text-forest/50 mt-1">Confirm your details before creating your account.</p>
                       </div>
                       <div className="bg-beige/50 rounded-xl p-6 space-y-4 border border-forest/8">
                         {([
                           { label: "Name",          value: form.name,          isLink: false },
                           { label: "Email",         value: form.email,         isLink: false },
+                          { label: "Password",      value: "••••••••",         isLink: false },
                           { label: "Mobile",        value: form.mobile || "—", isLink: false },
                           { label: "Investor type", value: investorTypeOptions.find(o => o.value === form.investorType)?.label || "—", isLink: false },
                           { label: "Firm",          value: form.firmName || "—",    isLink: false },
@@ -1334,7 +1472,7 @@ export default function InvestorApplyPage() {
                       </div>
                       <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-100 rounded-xl">
                         <CheckCircle className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                        <p className="text-xs text-blue-700 leading-relaxed">After submission, our team will review your application. If approved, you'll receive an email to set your password and activate your account.</p>
+                        <p className="text-xs text-blue-700 leading-relaxed">Your investor account will be created immediately. You can sign in right away using the email and password you set above.</p>
                       </div>
                       <p className="text-xs text-forest/40 leading-relaxed">By submitting you agree to VentureHub's Terms of Service and Privacy Policy.</p>
                     </section>
@@ -1361,7 +1499,7 @@ export default function InvestorApplyPage() {
                       ) : (
                         <button type="button" onClick={handleSubmit} disabled={isSubmitting}
                           className="flex items-center gap-2 px-6 py-3 bg-forest text-white font-bold uppercase text-xs tracking-[0.15em] hover:bg-forest/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-sm shadow-forest/10">
-                          {isSubmitting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Submitting…</> : "Submit Application"}
+                          {isSubmitting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Creating account…</> : "Create Account"}
                         </button>
                       )}
                     </div>
