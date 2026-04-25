@@ -104,7 +104,7 @@ export default function EOIInboxClient({ companyName, eois }: Props) {
   function toggleStatus(s: string) {
     setActiveStatuses((prev) => {
       const next = new Set(prev)
-      next.has(s) ? next.delete(s) : next.add(s)
+      if (next.has(s)) { next.delete(s) } else { next.add(s) }
       return next
     })
   }
@@ -112,7 +112,7 @@ export default function EOIInboxClient({ companyName, eois }: Props) {
   function toggleType(t: string) {
     setActiveTypes((prev) => {
       const next = new Set(prev)
-      next.has(t) ? next.delete(t) : next.add(t)
+      if (next.has(t)) { next.delete(t) } else { next.add(t) }
       return next
     })
   }
