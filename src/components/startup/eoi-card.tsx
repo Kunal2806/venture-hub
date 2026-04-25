@@ -1,7 +1,8 @@
-// app/dashboard/startup/eois/_components/eoi-card.tsx
 "use client"
 
 import { useState } from "react"
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type EOIStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "WITHDRAWN"
 type DealStage =
@@ -15,7 +16,7 @@ type DealStage =
 
 interface EOICardProps {
   eoiId: string
-  investorName: string
+  investorName: string | null
   firmName: string | null
   designation: string | null
   investorType: string | null
@@ -23,22 +24,19 @@ interface EOICardProps {
   proposedAmount: string | null
   status: EOIStatus
   dealStage: DealStage
-  sentAt: Date
+  sentAt: Date | string
 }
 
-const STATUS_STYLES: Record<EOIStatus, string> = {
-  PENDING:   "bg-amber-50 text-amber-800 border border-amber-200",
-  ACCEPTED:  "bg-emerald-50 text-emerald-800 border border-emerald-200",
-  REJECTED:  "bg-red-50 text-red-700 border border-red-200",
-  WITHDRAWN: "bg-stone-100 text-stone-600 border border-stone-200",
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const STATUS_META: Record<EOIStatus, { label: string; dot: string; bg: string; border: string; text: string }> = {
+  PENDING:   { label: "Pending",   dot: "#d97706", bg: "#fffbeb", border: "#fde68a", text: "#92400e" },
+  ACCEPTED:  { label: "Accepted",  dot: "#059669", bg: "#ecfdf5", border: "#a7f3d0", text: "#065f46" },
+  REJECTED:  { label: "Rejected",  dot: "#dc2626", bg: "#fef2f2", border: "#fecaca", text: "#991b1b" },
+  WITHDRAWN: { label: "Withdrawn", dot: "#6b7280", bg: "#f9fafb", border: "#e5e7eb", text: "#374151" },
 }
 
-const STATUS_LABELS: Record<EOIStatus, string> = {
-  PENDING:   "Pending",
-  ACCEPTED:  "Accepted",
-  REJECTED:  "Rejected",
-  WITHDRAWN: "Withdrawn",
-}
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatAmount(amount: string | null): string | null {
   if (!amount) return null
@@ -48,6 +46,13 @@ function formatAmount(amount: string | null): string | null {
   if (num >= 1_000) return `$${(num / 1_000).toFixed(0)}K`
   return `$${num.toFixed(0)}`
 }
+
+function initials(name: string | null): string {
+  if (!name) return "?"
+  return name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function EOICard({
   eoiId,
@@ -67,22 +72,19 @@ export default function EOICard({
 
   const isPending = currentStatus === "PENDING"
   const formattedAmount = formatAmount(proposedAmount)
+  const meta = STATUS_META[currentStatus]
 
   async function handleAction(action: "ACCEPT" | "REJECT") {
     if (loading || !isPending) return
-
     setLoading(action)
     setError(null)
-
     try {
       const res = await fetch("/api/eoi/respond", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ eoiId, action }),
       })
-
       const data: { success: boolean; message?: string } = await res.json()
-
       if (data.success) {
         setCurrentStatus(action === "ACCEPT" ? "ACCEPTED" : "REJECTED")
       } else {
@@ -95,137 +97,313 @@ export default function EOICard({
     }
   }
 
-  const initials = investorName
-    .split(" ")
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase()
-
   return (
-    <article className="bg-white border border-[rgba(26,54,43,0.1)] p-5 sm:p-6 transition-shadow hover:shadow-sm">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <>
+      <style>{`
+        .eoi-card { transition: box-shadow 0.2s ease; }
+        .eoi-card:hover { box-shadow: 0 2px 16px rgba(26,54,43,0.08); }
+        .eoi-accept:hover:not(:disabled) { opacity: 0.88; }
+        .eoi-reject:hover:not(:disabled) { border-color: #f87171 !important; color: #b91c1c !important; background-color: #fef2f2 !important; }
+        .eoi-accept:disabled, .eoi-reject:disabled { opacity: 0.5; cursor: not-allowed; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spin { animation: spin 0.7s linear infinite; }
+      `}</style>
 
-        {/* Left — investor info */}
-        <div className="flex items-start gap-4 min-w-0">
-          {/* Avatar */}
-          <div className="flex-shrink-0 w-11 h-11 bg-[var(--forest)] text-[var(--cream)] flex items-center justify-center text-sm font-semibold select-none">
-            {initials}
-          </div>
+      <article
+        className="eoi-card"
+        style={{
+          backgroundColor: "#fff",
+          border: "1px solid rgba(26,54,43,0.09)",
+          padding: "20px 24px",
+        }}
+      >
+        {/* ── Top row ───────────────────────────────────────────────── */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px" }}>
 
-          <div className="min-w-0">
-            <h3 className="font-semibold text-[var(--stone)] leading-snug truncate">
-              {investorName}
-            </h3>
+          {/* Avatar + info */}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", minWidth: 0 }}>
+            {/* Avatar */}
+            <div
+              style={{
+                flexShrink: 0,
+                width: "40px",
+                height: "40px",
+                backgroundColor: "var(--forest)",
+                color: "var(--cream)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "13px",
+                fontWeight: 700,
+                letterSpacing: "0.02em",
+                userSelect: "none",
+              }}
+            >
+              {initials(investorName)}
+            </div>
 
-            {(designation || firmName) && (
-              <p className="text-sm text-[var(--moss)] mt-0.5 truncate">
-                {[designation, firmName].filter(Boolean).join(" · ")}
-              </p>
-            )}
+            {/* Name / firm / badges */}
+            <div style={{ minWidth: 0 }}>
+              <h3
+                style={{
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  color: "var(--forest)",
+                  lineHeight: 1.3,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {investorName ?? "Unknown investor"}
+              </h3>
 
-            <div className="flex flex-wrap items-center gap-2 mt-2">
-              <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium tracking-wide ${STATUS_STYLES[currentStatus]}`}>
-                {STATUS_LABELS[currentStatus]}
-              </span>
-
-              {investorType && (
-                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[var(--beige)] text-[var(--moss)] border border-[rgba(26,54,43,0.08)]">
-                  {investorType.replace("_", " ")}
-                </span>
+              {(designation || firmName) && (
+                <p
+                  style={{
+                    fontSize: "12px",
+                    color: "rgba(26,54,43,0.5)",
+                    marginTop: "2px",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {[designation, firmName].filter(Boolean).join(" · ")}
+                </p>
               )}
 
-              {formattedAmount && (
-                <span className="text-xs text-[var(--moss)] font-medium">
-                  {formattedAmount} proposed
+              {/* Badge row */}
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px", marginTop: "8px" }}>
+                {/* Status badge */}
+                <span
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.09em",
+                    padding: "3px 8px",
+                    backgroundColor: meta.bg,
+                    border: `1px solid ${meta.border}`,
+                    color: meta.text,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "5px",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: "5px",
+                      height: "5px",
+                      borderRadius: "50%",
+                      backgroundColor: meta.dot,
+                      flexShrink: 0,
+                    }}
+                  />
+                  {meta.label}
                 </span>
-              )}
+
+                {/* Investor type */}
+                {investorType && (
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      padding: "3px 8px",
+                      backgroundColor: "rgba(26,54,43,0.05)",
+                      border: "1px solid rgba(26,54,43,0.1)",
+                      color: "rgba(26,54,43,0.55)",
+                    }}
+                  >
+                    {investorType.replace(/_/g, " ")}
+                  </span>
+                )}
+
+                {/* Proposed amount */}
+                {formattedAmount && (
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 500,
+                      color: "var(--forest)",
+                    }}
+                  >
+                    {formattedAmount} proposed
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Right — date */}
-        <p className="text-xs text-[var(--moss)] whitespace-nowrap mt-1 sm:mt-0 flex-shrink-0">
-          {new Intl.DateTimeFormat("en-IN", {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-          }).format(new Date(sentAt))}
-        </p>
-      </div>
-
-      {/* Message */}
-      {message && (
-        <p className="mt-4 text-sm text-[var(--stone)] leading-relaxed bg-[var(--cream)] border border-[rgba(26,54,43,0.06)] p-3">
-          &ldquo;{message}&rdquo;
-        </p>
-      )}
-
-      {/* Error */}
-      {error && (
-        <p className="mt-3 text-xs text-red-600 bg-red-50 border border-red-100 px-3 py-2">
-          {error}
-        </p>
-      )}
-
-      {/* Actions — only shown if PENDING */}
-      {isPending && (
-        <div className="mt-4 flex flex-wrap gap-3">
-          <button
-            onClick={() => handleAction("ACCEPT")}
-            disabled={loading !== null}
-            className="
-              flex items-center gap-2 px-4 py-2 text-sm font-medium
-              bg-[var(--forest)] text-[var(--cream)]
-              hover:opacity-90 active:scale-[0.98]
-              disabled:opacity-50 disabled:cursor-not-allowed
-              transition-all duration-200
-            "
+          {/* Date */}
+          <p
+            style={{
+              fontSize: "11px",
+              color: "rgba(26,54,43,0.4)",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+              marginTop: "2px",
+              fontVariantNumeric: "tabular-nums",
+            }}
           >
-            {loading === "ACCEPT" && (
-              <span className="w-3.5 h-3.5 border-2 border-[var(--cream)] border-t-transparent rounded-full animate-spin" />
-            )}
-            {loading === "ACCEPT" ? "Accepting…" : "Accept"}
-          </button>
+            {new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(sentAt))}
+          </p>
+        </div>
 
-          <button
-            onClick={() => handleAction("REJECT")}
-            disabled={loading !== null}
-            className="
-              flex items-center gap-2 px-4 py-2 text-sm font-medium
-              border border-[rgba(26,54,43,0.25)] text-[var(--stone)]
-              hover:border-red-400 hover:text-red-700 hover:bg-red-50
-              active:scale-[0.98]
-              disabled:opacity-50 disabled:cursor-not-allowed
-              transition-all duration-200
-            "
+        {/* ── Message ───────────────────────────────────────────────── */}
+        {message && (
+          <p
+            style={{
+              marginTop: "16px",
+              fontSize: "13px",
+              color: "rgba(26,54,43,0.7)",
+              lineHeight: 1.65,
+              backgroundColor: "rgba(26,54,43,0.025)",
+              border: "1px solid rgba(26,54,43,0.07)",
+              padding: "12px 14px",
+              fontStyle: "italic",
+            }}
           >
-            {loading === "REJECT" && (
-              <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            )}
-            {loading === "REJECT" ? "Rejecting…" : "Reject"}
-          </button>
-        </div>
-      )}
+            &ldquo;{message}&rdquo;
+          </p>
+        )}
 
-      {/* Post-action state */}
-      {currentStatus === "ACCEPTED" && !isPending && (
-        <div className="mt-4 flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-2">
-          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-          Accepted — conversation will be available shortly
-        </div>
-      )}
+        {/* ── Error ─────────────────────────────────────────────────── */}
+        {error && (
+          <p
+            style={{
+              marginTop: "12px",
+              fontSize: "12px",
+              color: "#b91c1c",
+              backgroundColor: "#fef2f2",
+              border: "1px solid #fecaca",
+              padding: "8px 12px",
+            }}
+          >
+            {error}
+          </p>
+        )}
 
-      {currentStatus === "REJECTED" && !isPending && (
-        <div className="mt-4 flex items-center gap-2 text-sm text-stone-500 bg-stone-50 border border-stone-100 px-3 py-2">
-          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-          EOI rejected
-        </div>
-      )}
-    </article>
+        {/* ── Actions (PENDING only) ─────────────────────────────────── */}
+        {isPending && (
+          <div style={{ marginTop: "16px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <button
+              className="eoi-accept"
+              onClick={() => handleAction("ACCEPT")}
+              disabled={loading !== null}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "7px",
+                padding: "8px 18px",
+                fontSize: "12px",
+                fontWeight: 600,
+                backgroundColor: "var(--forest)",
+                color: "var(--cream)",
+                border: "none",
+                cursor: "pointer",
+                transition: "opacity 0.15s ease",
+                letterSpacing: "0.02em",
+              }}
+            >
+              {loading === "ACCEPT" && (
+                <span
+                  className="spin"
+                  style={{
+                    display: "inline-block",
+                    width: "11px",
+                    height: "11px",
+                    border: "2px solid var(--cream)",
+                    borderTopColor: "transparent",
+                    borderRadius: "50%",
+                  }}
+                />
+              )}
+              {loading === "ACCEPT" ? "Accepting…" : "Accept"}
+            </button>
+
+            <button
+              className="eoi-reject"
+              onClick={() => handleAction("REJECT")}
+              disabled={loading !== null}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "7px",
+                padding: "8px 18px",
+                fontSize: "12px",
+                fontWeight: 600,
+                backgroundColor: "transparent",
+                color: "rgba(26,54,43,0.6)",
+                border: "1px solid rgba(26,54,43,0.22)",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+                letterSpacing: "0.02em",
+              }}
+            >
+              {loading === "REJECT" && (
+                <span
+                  className="spin"
+                  style={{
+                    display: "inline-block",
+                    width: "11px",
+                    height: "11px",
+                    border: "2px solid currentColor",
+                    borderTopColor: "transparent",
+                    borderRadius: "50%",
+                  }}
+                />
+              )}
+              {loading === "REJECT" ? "Rejecting…" : "Reject"}
+            </button>
+          </div>
+        )}
+
+        {/* ── Post-action banners ────────────────────────────────────── */}
+        {currentStatus === "ACCEPTED" && !isPending && (
+          <div
+            style={{
+              marginTop: "16px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              fontSize: "12px",
+              color: "#065f46",
+              backgroundColor: "#ecfdf5",
+              border: "1px solid #a7f3d0",
+              padding: "9px 12px",
+            }}
+          >
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            Accepted — conversation will be available shortly
+          </div>
+        )}
+
+        {currentStatus === "REJECTED" && !isPending && (
+          <div
+            style={{
+              marginTop: "16px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              fontSize: "12px",
+              color: "rgba(26,54,43,0.45)",
+              backgroundColor: "rgba(26,54,43,0.03)",
+              border: "1px solid rgba(26,54,43,0.09)",
+              padding: "9px 12px",
+            }}
+          >
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            EOI declined
+          </div>
+        )}
+      </article>
+    </>
   )
 }
