@@ -23,7 +23,7 @@ export const publicRoutes: string[] = [
 // APIs which are accessible to all.
 export const publicApis: string[] = [
   "/api/apply",
-  "/api/investors/apply",
+  "/api/investors/create",
   "/api/countries"
 ];
 
