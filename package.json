@@ -23,6 +23,7 @@
     "clsx": "^2.1.1",
     "country-flag-emoji-json": "^2.0.0",
     "country-telephone-data": "^0.6.3",
+    "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.39.3",
     "i18n-iso-countries": "^7.14.0",

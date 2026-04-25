@@ -1,18 +1,22 @@
-import { Conversation, Message } from "@/db/schema";
-
-// Conversation enriched with other-party name + last message preview
-export type ConversationWithParty = Conversation & {
-  otherPartyName: string;
-  lastMessage: string | null;
-  lastMessageAt: Date | null;
-};
-
-// Message enriched with sender display name
-export type MessageWithSender = Message & {
-  senderName: string;
-};
-
-// Standard API response envelope
-export type ApiResponse<T = undefined> =
-  | { success: true; data: T; message?: string }
+export type ApiResponse<T> =
+  | { success: true; data: T }
   | { success: false; message: string };
+
+export interface ConversationWithParty {
+  id: string;
+  lastMessageAt: string | null;
+  otherPartyName: string;   // startup name (for investor view) or investor name (for startup view)
+  otherPartyInitials: string;
+  lastMessagePreview: string | null;
+  hasUnread: boolean;
+}
+
+export interface MessageWithSender {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  content: string;
+  createdAt: string;
+  senderName: string;
+  senderInitials: string;
+}

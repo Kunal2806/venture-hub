@@ -1,127 +1,124 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { ApiResponse } from "./types";
+import { useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
-type SendMessageFormProps = {
+interface SendMessageFormProps {
   conversationId: string;
-};
+}
 
 export function SendMessageForm({ conversationId }: SendMessageFormProps) {
-  const [content, setContent] = useState("");
+  const [value, setValue] = useState("");
+  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [isPending, setIsPending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const router = useRouter();
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
-
-    const trimmed = content.trim();
-    if (!trimmed) {
-      setError("Message cannot be empty.");
-      return;
-    }
-    if (trimmed.length > 5000) {
-      setError("Message is too long (max 5000 characters).");
-      return;
-    }
-
-    setIsPending(true);
-
-    try {
-      const res = await fetch(
-        `/api/messaging/conversations/${conversationId}/messages`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: trimmed }),
-        }
-      );
-
-      const data: ApiResponse = await res.json();
-
-      if (!res.ok || !data.success) {
-        setError(data.message ?? "Failed to send. Please try again.");
-        return;
-      }
-
-      setContent("");
-      textareaRef.current?.focus();
-
-      // Re-fetch the server component to show the new message
-      window.location.reload();
-    } catch {
-      setError("Network error. Please check your connection.");
-    } finally {
-      setIsPending(false);
-    }
+  function autoResize(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setValue(e.target.value);
+    const el = e.target;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 120) + "px";
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    // Ctrl/Cmd + Enter to send
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      e.currentTarget.form?.requestSubmit();
+      submit();
     }
   }
 
+  function submit() {
+    const trimmed = value.trim();
+    if (!trimmed || isPending) return;
+
+    setError(null);
+    setValue("");
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+
+    startTransition(async () => {
+      try {
+        const res = await fetch(
+          `/api/messaging/conversations/${conversationId}/messages`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content: trimmed }),
+          }
+        );
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          setError(data.message ?? "Failed to send message.");
+          setValue(trimmed); // restore draft on failure
+          return;
+        }
+        router.refresh(); // re-fetch server components (ChatWindow)
+      } catch {
+        setError("Network error. Please try again.");
+        setValue(trimmed);
+      }
+    });
+  }
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="border-t border-[#1A362B]/10 bg-white p-4 sm:p-6"
-      aria-label="Send a message"
-    >
+    <div className="flex-shrink-0 border-t border-[#1A362B]/[0.08] bg-white">
       {error && (
-        <p role="alert" className="mb-2 text-sm text-red-500">
+        <div
+          role="alert"
+          className="mx-5 mt-3 border-l-2 border-red-400 bg-red-50 px-4 py-2 text-xs font-medium text-red-600"
+        >
           {error}
-        </p>
+        </div>
       )}
 
-      <div className="flex items-end gap-3">
+      <div className="flex items-end gap-3 px-5 py-4">
         <textarea
           ref={textareaRef}
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
+          value={value}
+          onChange={autoResize}
           onKeyDown={handleKeyDown}
-          placeholder="Type a message… (Ctrl+Enter to send)"
-          rows={2}
-          maxLength={5000}
+          rows={1}
+          placeholder="Type a message… (Enter to send, Shift+Enter for newline)"
           disabled={isPending}
-          aria-label="Message content"
-          className={[
-            "flex-1 resize-none border-b bg-transparent py-2 text-sm text-[#2D2D2D]",
-            "placeholder:text-[#1A362B]/30 transition-colors duration-200",
-            "focus:border-[#1A362B] focus:outline-none",
-            "disabled:opacity-50 border-[#1A362B]/20",
-          ].join(" ")}
+          aria-label="Message input"
+          className="
+            flex-1 resize-none bg-transparent
+            border-0 border-b border-[#1A362B]/[0.18]
+            pb-2 pt-1 text-sm text-[#2D2D2D]
+            placeholder:text-[#1A362B]/25
+            focus:outline-none focus:border-[#1A362B]
+            transition-colors leading-relaxed overflow-hidden
+            disabled:opacity-50
+          "
+          style={{ minHeight: 36, maxHeight: 120, fontFamily: "'Satoshi', sans-serif" }}
         />
 
         <button
-          type="submit"
-          disabled={isPending || !content.trim()}
-          className={[
-            "shrink-0 bg-[#1A362B] px-5 py-2.5 text-sm font-semibold uppercase",
-            "tracking-widest text-[#F9F7F2] transition-opacity duration-200",
-            "disabled:cursor-not-allowed disabled:opacity-50",
-            "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
-            "focus-visible:outline-[#1A362B]",
-          ].join(" ")}
+          onClick={submit}
+          disabled={!value.trim() || isPending}
+          aria-label="Send message"
+          className="
+            flex-shrink-0 px-5 py-2.5
+            bg-[#1A362B] text-[#F9F7F2]
+            text-[11px] font-bold uppercase tracking-widest
+            transition-opacity duration-200
+            hover:opacity-85 active:opacity-70
+            disabled:opacity-30 disabled:cursor-not-allowed
+          "
         >
           {isPending ? (
-            <span
-              className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[#F9F7F2] border-t-transparent"
-              aria-hidden="true"
-            />
+            <span className="flex items-center gap-1.5">
+              <svg className="animate-spin" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.5" strokeDasharray="20" strokeDashoffset="10" opacity="0.4" />
+                <path d="M6 1a5 5 0 015 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              Sending
+            </span>
           ) : (
             "Send"
           )}
         </button>
       </div>
-
-      <p className="mt-1 text-right text-xs text-[#1A362B]/30">
-        {content.length} / 5000
-      </p>
-    </form>
+    </div>
   );
 }
