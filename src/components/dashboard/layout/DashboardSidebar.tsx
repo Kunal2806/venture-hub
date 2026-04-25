@@ -227,7 +227,7 @@ const ROLE_META: Record<
   INVESTOR: {
     title: "Investor Dashboard",
     description: "Discover startups. Manage your pipeline.",
-    accent: "from-[#1A362B] to-blue-700",
+    accent: "from-[#1A362B] to-[#2D5A47]",
     icon: <Briefcase className="h-3.5 w-3.5" />,
   },
   MENTOR: {
