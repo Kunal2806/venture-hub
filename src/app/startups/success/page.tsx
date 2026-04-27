@@ -5,30 +5,19 @@ import { useRouter } from "next/navigation";
 import { Navigation } from "@/components/home/Navigation";
 import { Footer } from "@/components/home/Footer";
 import { CheckCircle, Mail, Clock, ArrowRight } from "lucide-react";
-import ReactConfetti from "react-confetti"; 
+import ReactConfetti from "react-confetti";
 
 export default function ApplySuccessPage() {
   const router = useRouter();
-  const [email, setEmail] = useState<string>("");
-  
-  // ADD THESE THREE
   const [showConfetti, setShowConfetti] = useState(true);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
 
-  useEffect(() => {
-    const savedEmail = localStorage.getItem("application-email");
-    if (savedEmail) setEmail(savedEmail);
-  }, []);
-
-  // ADD THIS EFFECT
   useEffect(() => {
     const update = () =>
       setWindowSize({ width: window.innerWidth, height: window.innerHeight });
     update();
     window.addEventListener("resize", update);
-
-    const timer = setTimeout(() => setShowConfetti(false), 5000); // stops after 5s
-
+    const timer = setTimeout(() => setShowConfetti(false), 5000);
     return () => {
       window.removeEventListener("resize", update);
       clearTimeout(timer);
@@ -37,8 +26,6 @@ export default function ApplySuccessPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-
-      {/* ADD THIS BLOCK */}
       {showConfetti && (
         <ReactConfetti
           width={windowSize.width}
@@ -69,7 +56,7 @@ export default function ApplySuccessPage() {
 
           <div className="bg-white/40 backdrop-blur-sm p-8 sm:p-12 border border-forest/5 shadow-2xl rounded-lg reveal animation-delay-150">
             <div className="space-y-8">
-              {/* What happens next */}
+
               <div>
                 <h2 className="font-serif text-2xl text-forest mb-6">What happens next?</h2>
                 <div className="space-y-4">
@@ -80,7 +67,7 @@ export default function ApplySuccessPage() {
                     <div>
                       <h3 className="font-bold text-forest mb-1">Check your email</h3>
                       <p className="text-forest/60 text-sm">
-                        We've sent a confirmation email to {email || "your email address"}. 
+                        We've sent a confirmation email to your email address.
                         This contains your application ID and next steps.
                       </p>
                     </div>
@@ -93,7 +80,7 @@ export default function ApplySuccessPage() {
                     <div>
                       <h3 className="font-bold text-forest mb-1">Review process</h3>
                       <p className="text-forest/60 text-sm">
-                        Our team will review your application within 3-5 business days. 
+                        Our team will review your application within 3-5 business days.
                         You'll receive another email once a decision has been made.
                       </p>
                     </div>
@@ -101,37 +88,20 @@ export default function ApplySuccessPage() {
                 </div>
               </div>
 
-              {/* Next steps */}
               <div className="pt-6 border-t border-forest/10">
-                <h2 className="font-serif text-2xl text-forest mb-6">While you wait</h2>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <button
-                    onClick={() => window.open("https://docs.venturehub.com", "_blank")}
-                    className="text-left p-4 border border-forest/10 hover:border-forest/30 rounded-lg transition-colors group"
-                  >
-                    <h3 className="font-bold text-forest mb-1 group-hover:text-forest/80">Read our docs</h3>
-                    <p className="text-xs text-forest/40">Learn more about the platform</p>
-                  </button>
-                  <button
-                    onClick={() => router.push("/startups/guide")}
-                    className="text-left p-4 border border-forest/10 hover:border-forest/30 rounded-lg transition-colors group"
-                  >
-                    <h3 className="font-bold text-forest mb-1 group-hover:text-forest/80">Founder's guide</h3>
-                    <p className="text-xs text-forest/40">Tips for a successful journey</p>
-                  </button>
-                </div>
-              </div>
-
-              {/* Check status button */}
-              <div className="pt-6">
+                <h2 className="font-serif text-2xl text-forest mb-2">Track your application</h2>
+                <p className="text-sm text-forest/50 mb-6">
+                  Visit the status page at any time to see real-time updates on your application.
+                </p>
                 <button
-                  onClick={() => router.push(`/apply/status?email=${encodeURIComponent(email)}`)}
-                  className="w-full sm:w-auto px-8 py-4 bg-forest text-white font-bold uppercase text-xs tracking-[0.2em] hover:bg-forest/90 transition-colors flex items-center justify-center gap-2 mx-auto"
+                  onClick={() => router.push("/apply/status")}
+                  className="px-8 py-3 bg-forest text-white font-bold uppercase text-xs tracking-[0.2em] hover:bg-forest/90 transition-colors rounded-lg flex items-center gap-2"
                 >
-                  Check Application Status
+                  View Application Status
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
+
             </div>
           </div>
         </div>

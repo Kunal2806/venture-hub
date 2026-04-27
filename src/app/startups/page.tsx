@@ -30,7 +30,6 @@ const stageMapping = {
   "Seed / Early": "SEED",
 } as const;
 
-// FIX: Type the stageMapping keys explicitly so TypeScript narrows correctly
 type StageLabel = keyof typeof stageMapping;
 
 const industryOptions: { value: SectorValue; label: string }[] = [
@@ -132,51 +131,24 @@ const TZ_TO_CC: Record<string, string> = {
   "Europe/Warsaw": "PL", "Europe/Zurich": "CH", "Pacific/Auckland": "NZ",
 };
 
-// FIX: Only non-PII fields are safe to persist in sessionStorage
-const DRAFT_SAFE_FIELDS = [
-  "companyName", "sector", "stage", "websiteUrl",
-  "impactDescription", "impactMetrics", "useOfFunds",
-] as const;
+// ─── Required fields per step ──────────────────────────────────────────────────
 
-type DraftSafeField = typeof DRAFT_SAFE_FIELDS[number];
+const REQUIRED_FIELDS: Record<number, string[]> = {
+  0: ["founderName", "email"],
+  1: ["companyName", "sector"],
+  2: [],
+  3: [],
+  4: [],
+};
 
-// ─── Micro components ──────────────────────────────────────────────────────────
+const REQUIRED_FIELD_LABELS: Record<string, string> = {
+  founderName: "Full Name",
+  email:       "Professional Email",
+  companyName: "Company Name",
+  sector:      "Primary Industry",
+};
 
-function FieldError({ msg }: { msg?: string }) {
-  if (!msg) return null;
-  return (
-    <div className="flex items-start gap-1.5 mt-1.5 animate-fade-in">
-      <AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0 mt-[1px]" />
-      <p className="text-red-500 text-xs leading-tight">{msg}</p>
-    </div>
-  );
-}
-function FieldWarn({ msg }: { msg?: string }) {
-  if (!msg) return null;
-  return (
-    <div className="flex items-start gap-1.5 mt-1.5 animate-fade-in">
-      <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-[1px]" />
-      <p className="text-amber-600 text-xs leading-tight">{msg}</p>
-    </div>
-  );
-}
-function FieldOk({ msg }: { msg?: string }) {
-  if (!msg) return null;
-  return (
-    <div className="flex items-start gap-1.5 mt-1.5 animate-fade-in">
-      <CheckCircle className="w-3.5 h-3.5 text-green-600 flex-shrink-0 mt-[1px]" />
-      <p className="text-green-700 text-xs leading-tight">{msg}</p>
-    </div>
-  );
-}
-function CharCount({ cur, max }: { cur: number; max: number }) {
-  const pct = cur / max;
-  return (
-    <span className={`text-[10px] tabular-nums transition-colors ${
-      pct >= 1 ? "text-red-500" : pct >= 0.85 ? "text-amber-500" : "text-forest/30"
-    }`}>{cur}/{max}</span>
-  );
-}
+// ─── Validation ────────────────────────────────────────────────────────────────
 
 type VResult = { error?: string; warning?: string; success?: string };
 
@@ -187,7 +159,7 @@ function validate(
 ): VResult {
   switch (id) {
     case "founderName":
-      if (!value.trim()) return { error: "Please enter your full name" };
+      if (!value.trim()) return { warning: "Full name is required to proceed" };
       if (value.trim().length < 2) return { error: "At least 2 characters" };
       if (value.length > CHAR_LIMITS.founderName) return { error: `Max ${CHAR_LIMITS.founderName} characters` };
       if (!/^[A-Za-z\u00C0-\u017E\s'\-]+$/.test(value.trim()))
@@ -195,7 +167,7 @@ function validate(
       return { success: "Looks good" };
 
     case "email": {
-      if (!value.trim()) return { error: "Email is required" };
+      if (!value.trim()) return { warning: "Email address is required" };
       if (value.length > CHAR_LIMITS.email) return { error: "Email is too long" };
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value.trim()))
         return { error: "Doesn't look valid — try name@company.com" };
@@ -221,13 +193,13 @@ function validate(
     }
 
     case "companyName":
-      if (!value.trim()) return { error: "Company name is required" };
+      if (!value.trim()) return { warning: "Company name is required" };
       if (value.trim().length < 2) return { error: "At least 2 characters" };
       if (value.length > CHAR_LIMITS.companyName) return { error: `Max ${CHAR_LIMITS.companyName} characters` };
       return { success: "Looks good" };
 
     case "sector":
-      if (!value) return { error: "Please select an industry" };
+      if (!value) return { warning: "Please select an industry to continue" };
       if (!(SECTOR_VALUES as readonly string[]).includes(value))
         return { error: "Please select a valid industry" };
       return {};
@@ -281,14 +253,63 @@ function validate(
   }
 }
 
+// ─── Step field map ────────────────────────────────────────────────────────────
+
+const STEP_FIELDS: Record<number, string[]> = {
+  0: ["founderName", "email", "mobile"],
+  1: ["companyName", "sector", "websiteUrl", "country"],
+  2: ["impactDescription"],
+  3: ["capitalRequested", "fundingPeriod", "useOfFunds"],
+  4: ["pitchDeckUrl"],
+};
+
+// ─── Micro components ──────────────────────────────────────────────────────────
+
+function FieldError({ msg }: { msg?: string }) {
+  if (!msg) return null;
+  return (
+    <div className="flex items-start gap-1.5 mt-1.5 animate-fade-in">
+      <AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0 mt-[1px]" />
+      <p className="text-red-500 text-xs leading-tight">{msg}</p>
+    </div>
+  );
+}
+function FieldWarn({ msg }: { msg?: string }) {
+  if (!msg) return null;
+  return (
+    <div className="flex items-start gap-1.5 mt-1.5 animate-fade-in">
+      <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-[1px]" />
+      <p className="text-amber-600 text-xs leading-tight">{msg}</p>
+    </div>
+  );
+}
+function FieldOk({ msg }: { msg?: string }) {
+  if (!msg) return null;
+  return (
+    <div className="flex items-start gap-1.5 mt-1.5 animate-fade-in">
+      <CheckCircle className="w-3.5 h-3.5 text-green-600 flex-shrink-0 mt-[1px]" />
+      <p className="text-green-700 text-xs leading-tight">{msg}</p>
+    </div>
+  );
+}
+function CharCount({ cur, max }: { cur: number; max: number }) {
+  const pct = cur / max;
+  return (
+    <span className={`text-[10px] tabular-nums transition-colors ${
+      pct >= 1 ? "text-red-500" : pct >= 0.85 ? "text-amber-500" : "text-forest/30"
+    }`}>{cur}/{max}</span>
+  );
+}
+
 // ─── Industry dropdown ─────────────────────────────────────────────────────────
 
 function IndustryDropdown({
-  value, onChange, hasError,
+  value, onChange, hasError, hasWarning,
 }: {
   value: string;
   onChange: (v: string) => void;
   hasError?: boolean;
+  hasWarning?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -308,7 +329,8 @@ function IndustryDropdown({
         type="button"
         onClick={() => setOpen(o => !o)}
         className={`input-field w-full flex items-center justify-between gap-2 cursor-pointer select-none text-left ${
-          hasError ? "border-red-300 bg-red-50/30" : ""
+          hasError   ? "border-red-300 bg-red-50/30"    :
+          hasWarning ? "border-amber-300 bg-amber-50/20" : ""
         }`}
       >
         <span className={selected ? "text-forest text-sm font-medium" : "text-forest/35 text-sm"}>
@@ -673,6 +695,7 @@ export default function ApplyPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [emailWarning, setEmailWarning] = useState<string | null>(null);
+  const [stepBlocked, setStepBlocked] = useState<string | null>(null);
 
   const [errs,  setErrs]  = useState<Record<string, string>>({});
   const [warns, setWarns] = useState<Record<string, string>>({});
@@ -776,6 +799,17 @@ export default function ApplyPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodValue, periodUnit]);
 
+  // ── Run initial validation for current step whenever step changes ───────────
+  useEffect(() => {
+    setStepBlocked(null);
+    const fields = STEP_FIELDS[currentStep] ?? [];
+    fields.forEach(id => {
+      const v = (form as Record<string, string>)[id] ?? "";
+      applyResult(id, validate(id, v, { dialCountry }));
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep]);
+
   useEffect(() => {
     document.body.style.overflow = showMobileMenu ? "hidden" : "unset";
     return () => { document.body.style.overflow = "unset"; };
@@ -794,17 +828,24 @@ export default function ApplyPage() {
     return "";
   }
 
+  // ── Real-time validation on every keystroke ────────────────────────────────
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
     const { id, value } = e.target;
+
+    if (id === "mobile" && /[^0-9\s\-()+]/.test(value)) return;
+
     const limit = CHAR_LIMITS[id as keyof typeof CHAR_LIMITS];
     const v = limit ? value.slice(0, limit) : value;
     setForm(prev => ({ ...prev, [id]: v }));
     setSubmitError(null);
+    setStepBlocked(null);
+
     applyResult(id, validate(id, v, { dialCountry }));
   }
 
   function handleDialChange(cc: string) {
     setDialCountry(cc);
+    setStepBlocked(null);
     if (cc) {
       const found = countries.find(c => c.code === cc);
       if (found) {
@@ -821,14 +862,6 @@ export default function ApplyPage() {
     }
   }
 
-  const STEP_FIELDS: Record<number, string[]> = {
-    0: ["founderName", "email", "mobile"],
-    1: ["companyName", "sector", "websiteUrl", "country"],
-    2: ["impactDescription"],
-    3: ["capitalRequested", "fundingPeriod", "useOfFunds"],
-    4: ["pitchDeckUrl"],
-  };
-
   function validateStep(step: number): boolean {
     let ok = true;
     for (const id of (STEP_FIELDS[step] ?? [])) {
@@ -836,6 +869,11 @@ export default function ApplyPage() {
       const r = validate(id, v, { dialCountry });
       applyResult(id, r);
       if (r.error) ok = false;
+    }
+    // Also fail if any required field is empty
+    for (const id of (REQUIRED_FIELDS[step] ?? [])) {
+      const v = (form as Record<string, string>)[id] ?? "";
+      if (!v.trim()) ok = false;
     }
     return ok;
   }
@@ -856,7 +894,6 @@ export default function ApplyPage() {
   const saveDraft = () => {
     try {
       const payload = {
-        // string fields
         companyName:       form.companyName,
         sector:            form.sector,
         stage:             form.stage,
@@ -868,7 +905,6 @@ export default function ApplyPage() {
         pitchDeckUrl:      form.pitchDeckUrl,
         capitalRequested:  form.capitalRequested,
         fundingPeriod:     form.fundingPeriod,
-        // extra state
         dialCountry,
         capitalCurrency,
         periodUnit,
@@ -881,15 +917,46 @@ export default function ApplyPage() {
   };
 
   const handleNext = () => {
-    if (validateStep(currentStep)) {
-      saveDraft();
-      setCurrentStep(p => p + 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+    // Trigger validation UI on all fields in this step first
+    for (const id of (STEP_FIELDS[currentStep] ?? [])) {
+      const v = (form as Record<string, string>)[id] ?? "";
+      applyResult(id, validate(id, v, { dialCountry }));
     }
+
+    // Check for empty required fields
+    const required = REQUIRED_FIELDS[currentStep] ?? [];
+    const emptyFields = required.filter(
+      id => !(form as Record<string, string>)[id]?.trim()
+    );
+
+    if (emptyFields.length > 0) {
+      const names = emptyFields
+        .map(f => REQUIRED_FIELD_LABELS[f] ?? f)
+        .join(", ");
+      setStepBlocked(`Please fill in the required fields before continuing: ${names}.`);
+      return;
+    }
+
+    // Check for hard validation errors
+    const hasErrors = (STEP_FIELDS[currentStep] ?? []).some(id => {
+      const v = (form as Record<string, string>)[id] ?? "";
+      return validate(id, v, { dialCountry }).error;
+    });
+
+    if (hasErrors) {
+      setStepBlocked("Please fix the errors above before continuing.");
+      return;
+    }
+
+    setStepBlocked(null);
+    saveDraft();
+    setCurrentStep(p => p + 1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handlePrevious = () => {
     if (currentStep > 0) {
+      setStepBlocked(null);
       setCurrentStep(p => p - 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -897,6 +964,7 @@ export default function ApplyPage() {
 
   const handleStepClick = (i: number) => {
     if (i <= currentStep || validateStep(currentStep)) {
+      setStepBlocked(null);
       setCurrentStep(i);
       setShowMobileMenu(false);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -922,7 +990,6 @@ export default function ApplyPage() {
     setEmailWarning(null);
 
     try {
-      // ── Format phone to E.164 if a country code is selected ──────────────
       let formattedPhone: string | undefined;
       if (form.mobile.trim() && dialCountry) {
         try {
@@ -932,16 +999,9 @@ export default function ApplyPage() {
         }
       }
 
-      // ── Validate currency code against allowlist ──────────────────────────
       const safeCurrency = VALID_CURRENCY_CODES.has(capitalCurrency) ? capitalCurrency : "USD";
-
-      // FIX: Send capitalRequested as-is (commas included).
-      // The schema regex /^[\d.,]*$/ accepts formatted numbers like "5,00,000".
-      // The route prefixes the currency: "INR 5,00,000" stored in one column.
       const rawCapital = form.capitalRequested || undefined;
 
-      // FIX: Ensure stage is always a valid mapped value — guard against
-      // stale state where form.stage somehow isn't a known key.
       const mappedStage = stageMapping[form.stage];
       if (!mappedStage) {
         throw new Error("Invalid stage selected. Please go back to Step 2 and reselect.");
@@ -953,15 +1013,11 @@ export default function ApplyPage() {
         body: JSON.stringify({
           founderName:       form.founderName,
           email:             form.email,
-          // FIX: Only include mobile if it has a value — omitting sends
-          // undefined which the schema treats as optional (absent), not "".
           mobile:            formattedPhone || undefined,
           companyName:       form.companyName,
           sector:            form.sector,
           stage:             mappedStage,
           country:           form.country           || undefined,
-          // FIX: Send empty-string optional URLs as undefined so the schema's
-          // .optional() branch is hit instead of the isSafeUrl() refine branch.
           websiteUrl:        form.websiteUrl        || undefined,
           pitchDeckUrl:      form.pitchDeckUrl      || undefined,
           impactDescription: form.impactDescription || undefined,
@@ -982,8 +1038,6 @@ export default function ApplyPage() {
         if (response.status === 409) {
           throw new Error("An application with this email already exists.");
         }
-        // FIX: Surface Zod field-level errors clearly so the user knows
-        // exactly which field failed instead of seeing generic "Required"
         if (response.status === 400) {
           if (data.details && Array.isArray(data.details)) {
             const msgs = data.details
@@ -998,7 +1052,6 @@ export default function ApplyPage() {
         throw new Error(data.error || "Something went wrong. Please try again.");
       }
 
-      // ── Success ───────────────────────────────────────────────────────────
       try {
         sessionStorage.removeItem("venturehub-draft");
         localStorage.removeItem("venturehub-draft");
@@ -1092,7 +1145,6 @@ export default function ApplyPage() {
                     <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="text-red-700 text-sm font-medium">Submission failed</p>
-                      {/* FIX: Use whitespace-pre-line so \n-separated field errors render on separate lines */}
                       <p className="text-red-600 text-xs mt-0.5 whitespace-pre-line">{submitError}</p>
                     </div>
                   </div>
@@ -1124,6 +1176,7 @@ export default function ApplyPage() {
                           className={`input-field ${fieldCls("founderName")}`}
                           placeholder="Elara Vance" value={form.founderName} onChange={handleChange} />
                         <FieldError msg={errs.founderName} />
+                        <FieldWarn  msg={warns.founderName} />
                         <FieldOk   msg={oks.founderName} />
                         <p className="text-[10px] text-forest/30 mt-1">Letters, spaces, hyphens, apostrophes · 2–{CHAR_LIMITS.founderName} chars</p>
                       </div>
@@ -1144,15 +1197,25 @@ export default function ApplyPage() {
                         </label>
                         <div className="grid grid-cols-2 gap-2">
                           <PhoneCountryDropdown value={dialCountry} onChange={handleDialChange} countries={countries} loading={countriesLoading} />
-                          <input type="tel" id="mobile" autoComplete="tel-national"
-                            className={`input-field ${fieldCls("mobile")}`}
+                          <input
+                            type="tel"
+                            id="mobile"
+                            autoComplete="tel-national"
+                            disabled={!dialCountry}
+                            title={!dialCountry ? "Select a country code first" : undefined}
+                            className={`input-field ${fieldCls("mobile")} ${
+                              !dialCountry ? "opacity-40 cursor-not-allowed bg-forest/5" : ""
+                            }`}
                             placeholder={
-                              dialCountry === "IN" ? "98765 43210"
+                              !dialCountry        ? "Select a country code first"
+                              : dialCountry === "IN" ? "98765 43210"
                               : dialCountry === "US" ? "(555) 123-4567"
                               : dialCountry === "GB" ? "07700 900123"
                               : "Enter number"
                             }
-                            value={form.mobile} onChange={handleChange} />
+                            value={form.mobile}
+                            onChange={handleChange}
+                          />
                         </div>
                         <FieldError msg={errs.mobile} />
                         <FieldWarn  msg={warns.mobile} />
@@ -1195,6 +1258,7 @@ export default function ApplyPage() {
                           className={`input-field ${fieldCls("companyName")}`}
                           placeholder="Aeris Bio" value={form.companyName} onChange={handleChange} />
                         <FieldError msg={errs.companyName} />
+                        <FieldWarn  msg={warns.companyName} />
                         <FieldOk   msg={oks.companyName} />
                       </div>
 
@@ -1205,10 +1269,13 @@ export default function ApplyPage() {
                           onChange={v => {
                             setForm(prev => ({ ...prev, sector: v }));
                             applyResult("sector", validate("sector", v));
+                            setStepBlocked(null);
                           }}
                           hasError={!!errs.sector}
+                          hasWarning={!!warns.sector}
                         />
                         <FieldError msg={errs.sector} />
+                        <FieldWarn  msg={warns.sector} />
                       </div>
 
                       <div>
@@ -1217,7 +1284,6 @@ export default function ApplyPage() {
                           {stages.map(s => (
                             <label key={s} className={`flex items-center gap-2 px-3 py-2.5 border rounded-lg cursor-pointer transition-all ${form.stage === s ? "bg-forest text-white border-forest shadow-sm" : "bg-beige/50 border-forest/10 hover:bg-beige"}`}>
                               <input type="radio" name="stage" value={s} checked={form.stage === s}
-                                // FIX: cast s to StageLabel so TypeScript accepts it
                                 onChange={() => setForm(p => ({ ...p, stage: s as StageLabel }))}
                                 className="sr-only" />
                               <span className={`text-xs font-bold uppercase tracking-widest ${form.stage === s ? "text-white" : "text-forest/70"}`}>{s}</span>
@@ -1383,27 +1449,38 @@ export default function ApplyPage() {
                       <Save className="w-3.5 h-3.5" />
                       <span className="hidden sm:inline">Save</span>
                     </button>
-                    <div className="flex gap-2">
-                      {currentStep > 0 && (
-                        <button type="button" onClick={handlePrevious}
-                          className="flex items-center gap-1.5 px-4 py-3 border border-forest/20 text-forest font-bold uppercase text-xs tracking-[0.15em] hover:bg-beige transition-colors rounded-lg">
-                          <ChevronLeft className="w-3.5 h-3.5" />Back
-                        </button>
+
+                    <div className="flex flex-col items-end gap-2">
+                      {/* ── Blocked warning banner ── */}
+                      {stepBlocked && (
+                        <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg animate-fade-in">
+                          <AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+                          <p className="text-red-600 text-xs font-medium leading-tight">{stepBlocked}</p>
+                        </div>
                       )}
-                      {currentStep < steps.length - 1 ? (
-                        <button type="button" onClick={handleNext}
-                          className="flex items-center gap-1.5 px-6 py-3 bg-forest text-white font-bold uppercase text-xs tracking-[0.15em] hover:bg-forest/90 transition-colors rounded-lg shadow-sm shadow-forest/10">
-                          Continue<ChevronRight className="w-3.5 h-3.5" />
-                        </button>
-                      ) : (
-                        <button type="button" onClick={handleSubmit} disabled={isSubmitting}
-                          className="flex items-center gap-2 px-6 py-3 bg-forest text-white font-bold uppercase text-xs tracking-[0.15em] hover:bg-forest/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-sm shadow-forest/10">
-                          {isSubmitting
-                            ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Submitting…</>
-                            : "Submit Application"
-                          }
-                        </button>
-                      )}
+
+                      <div className="flex gap-2">
+                        {currentStep > 0 && (
+                          <button type="button" onClick={handlePrevious}
+                            className="flex items-center gap-1.5 px-4 py-3 border border-forest/20 text-forest font-bold uppercase text-xs tracking-[0.15em] hover:bg-beige transition-colors rounded-lg">
+                            <ChevronLeft className="w-3.5 h-3.5" />Back
+                          </button>
+                        )}
+                        {currentStep < steps.length - 1 ? (
+                          <button type="button" onClick={handleNext}
+                            className="flex items-center gap-1.5 px-6 py-3 bg-forest text-white font-bold uppercase text-xs tracking-[0.15em] hover:bg-forest/90 transition-colors rounded-lg shadow-sm shadow-forest/10">
+                            Continue<ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <button type="button" onClick={handleSubmit} disabled={isSubmitting}
+                            className="flex items-center gap-2 px-6 py-3 bg-forest text-white font-bold uppercase text-xs tracking-[0.15em] hover:bg-forest/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-sm shadow-forest/10">
+                            {isSubmitting
+                              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Submitting…</>
+                              : "Submit Application"
+                            }
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </form>

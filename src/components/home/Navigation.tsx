@@ -18,7 +18,7 @@ const topNavLinks = [
   { key: "startups",   label: "Startups",   href: "/startups" },
   { key: "investors",  label: "Investors",  href: "/investors" },
   { key: "mentorship", label: "Mentorship", href: "/mentorship" },
-  { key: "profile",    label: "Profile",    href: "/profile" },
+  { key: "About",    label: "About",    href: "/about" },
 ];
 
 const bottomTabs = [
@@ -26,7 +26,7 @@ const bottomTabs = [
   { key: "startups",   label: "Startups",  href: "/startups",   Icon: Sprout },
   { key: "investors",  label: "Portfolio", href: "/investors",  Icon: Landmark },
   { key: "mentorship", label: "Mentors",   href: "/mentorship", Icon: Users },
-  { key: "profile",    label: "Profile",   href: "/profile",    Icon: User },
+  { key: "About",    label: "About",   href: "/about",    Icon: User },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────

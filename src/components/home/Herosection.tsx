@@ -25,13 +25,13 @@ export function HeroSection() {
               href="/startups"
               className="btn-primary text-center px-8 sm:px-10 py-4 sm:py-5 bg-[#1A362B] text-white font-bold uppercase text-xs tracking-[0.2em] shadow-xl shadow-[#1A362B]/10 hover:bg-[#1A362B]/90 transition-colors"
             >
-              Begin Your Journey
+              List Your Startup
             </Link>
             <Link
               href="/investors"
               className="text-center px-8 sm:px-10 py-4 sm:py-5 border border-[#1A362B]/20 text-[#1A362B] font-bold uppercase text-xs tracking-[0.2em] hover:bg-[#EFEBE3] transition-colors"
             >
-              View Portfolio
+              Start Investing
             </Link>
           </div>
         </div>
@@ -52,8 +52,7 @@ export function HeroSection() {
             </div>
             
             {/* Quote Card - Hidden on mobile, shown on tablet and up */}
-            <div className="hidden sm:block absolute -bottom-8 lg:-bottom-10 -left-4 lg:-left-10 bg-[#EFEBE3] p-5 sm:p-8 shadow-lg max-w-[200px] sm:max-w-[240px]">
-              <Quote className="text-[#1A362B]/20 w-6 h-6 sm:w-8 sm:h-8 mb-3 sm:mb-4" />
+            <div className="hidden sm:block absolute -bottom-5 -left-4 lg:-left-10 bg-[#EFEBE3] p-5 sm:p-8 shadow-lg max-w-[200px] sm:max-w-[240px]">
               <p className="font-serif text-base sm:text-lg leading-snug italic text-[#1A362B]">
                 "Growth is not just about size, it is about the depth of your roots."
               </p>
