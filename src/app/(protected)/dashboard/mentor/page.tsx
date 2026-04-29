@@ -7,7 +7,6 @@ import {
   Save, CheckCircle, Loader2, AlertCircle,
   ChevronLeft, ChevronRight, X, ChevronDown, Search,
 } from "lucide-react";
-import { Navigation } from "@/components/home/Navigation";
 import { Footer } from "@/components/home/Footer";
 import { parsePhoneNumber, isValidPhoneNumber, CountryCode } from "libphonenumber-js";
 import { CHAR_LIMITS, SECTOR_VALUES, type SectorValue } from "@/lib/applicationSchema";
@@ -858,7 +857,7 @@ export default function ApplyPage() {
   if (!isClient) {
     return (
       <div className="min-h-screen flex flex-col">
-        <Navigation activeItem="home" />
+        {/* <Navigation activeItem="home" /> */}
         <main className="flex-1 pt-16 sm:pt-20 flex items-center justify-center">
           <div className="animate-pulse text-forest/40 text-sm">Loading…</div>
         </main>
@@ -870,7 +869,7 @@ export default function ApplyPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-beige/30">
-      <Navigation activeItem="home" />
+      {/* <Navigation activeItem="home" /> */}
 
       {/* Sticky mobile progress */}
       <div className="lg:hidden sticky top-16 z-40 bg-white border-b border-forest/10 shadow-sm">

@@ -155,13 +155,13 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["ADMIN"],
     group: "admin",
   },
-  {
-    href: "/dashboard/admin/investors",
-    label: "Investors",
-    icon: <Briefcase className="h-4 w-4" />,
-    roles: ["ADMIN"],
-    group: "admin",
-  },
+  // {
+  //   href: "/dashboard/admin/investors",
+  //   label: "Investors",
+  //   icon: <Briefcase className="h-4 w-4" />,
+  //   roles: ["ADMIN"],
+  //   group: "admin",
+  // },
   {
     href: "/dashboard/admin/mentors",
     label: "Mentors",

@@ -1,142 +1,141 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { CheckCircle, ArrowRight, LayoutDashboard, UserCircle, Lock, Home } from "lucide-react";
 import { Navigation } from "@/components/home/Navigation";
 import { Footer } from "@/components/home/Footer";
-import { CheckCircle, Mail, Clock, ArrowRight } from "lucide-react";
-import ReactConfetti from "react-confetti";  // ADD THIS
 
-export default function ApplySuccessPage() {
-  const router = useRouter();
-  const [email, setEmail] = useState<string>("");
-  
-  // ADD THESE THREE
-  const [showConfetti, setShowConfetti] = useState(true);
-  const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
-
-  useEffect(() => {
-    const savedEmail = localStorage.getItem("application-email");
-    if (savedEmail) setEmail(savedEmail);
-  }, []);
-
-  // ADD THIS EFFECT
-  useEffect(() => {
-    const update = () =>
-      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
-    update();
-    window.addEventListener("resize", update);
-
-    const timer = setTimeout(() => setShowConfetti(false), 5000); // stops after 5s
-
-    return () => {
-      window.removeEventListener("resize", update);
-      clearTimeout(timer);
-    };
-  }, []);
-
+export default function InvestorSuccessPage() {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-beige/30">
+      <Navigation activeItem="home" />
 
-      {/* ADD THIS BLOCK */}
-      {showConfetti && (
-        <ReactConfetti
-          width={windowSize.width}
-          height={windowSize.height}
-          numberOfPieces={400}
-          recycle={false}
-          gravity={0.2}
-          colors={["#1a3a2a", "#4ade80", "#86efac", "#d4a574", "#fef3c7", "#f0fdf4", "#a3e635"]}
-          style={{ position: "fixed", top: 0, left: 0, zIndex: 9999, pointerEvents: "none" }}
-        />
-      )}
+      <main className="flex-1 flex items-center justify-center px-4 sm:px-6 py-16 sm:py-24">
+        <div className="w-full max-w-lg">
 
-      <Navigation activeItem="startups" />
-      <main className="flex-1 pt-24 sm:pt-32 pb-20 sm:pb-40 px-4 sm:px-8">
-        <div className="max-w-3xl mx-auto">
-          <div className="text-center mb-12 reveal">
-            <div className="w-20 h-20 bg-forest/10 rounded-full flex items-center justify-center text-forest mx-auto mb-6">
-              <CheckCircle className="w-10 h-10" />
-            </div>
-            <h1 className="font-serif text-4xl sm:text-5xl text-forest mb-4">
-              Application Received
-            </h1>
-            <p className="text-forest/70 text-lg max-w-xl mx-auto">
-              Thank you for applying to VentureHub. Your vision is now in our ecosystem.
-            </p>
-          </div>
+          {/* ── Card ── */}
+          <div className="bg-white/70 backdrop-blur-sm border border-forest/8 shadow-xl rounded-2xl overflow-hidden">
 
-          <div className="bg-white/40 backdrop-blur-sm p-8 sm:p-12 border border-forest/5 shadow-2xl rounded-lg reveal animation-delay-150">
-            <div className="space-y-8">
-              {/* What happens next */}
-              <div>
-                <h2 className="font-serif text-2xl text-forest mb-6">What happens next?</h2>
-                <div className="space-y-4">
-                  <div className="flex items-start gap-4">
-                    <div className="w-8 h-8 bg-forest/10 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Mail className="w-4 h-4 text-forest" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-forest mb-1">Check your email</h3>
-                      <p className="text-forest/60 text-sm">
-                        We've sent a confirmation email to {email || "your email address"}. 
-                        This contains your application ID and next steps.
-                      </p>
-                    </div>
+            {/* ── Top accent bar ── */}
+            <div className="h-1 w-full bg-forest" />
+
+            <div className="p-8 sm:p-12 space-y-8">
+
+              {/* ── 1. SUCCESS HERO ── */}
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className="relative">
+                  <div className="w-20 h-20 rounded-full bg-green-50 border-2 border-green-200 flex items-center justify-center">
+                    <CheckCircle className="w-10 h-10 text-green-600" strokeWidth={1.5} />
                   </div>
+                  {/* Subtle pulse ring */}
+                  <div className="absolute inset-0 rounded-full border-2 border-green-200 animate-ping opacity-30" />
+                </div>
 
-                  <div className="flex items-start gap-4">
-                    <div className="w-8 h-8 bg-forest/10 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Clock className="w-4 h-4 text-forest" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-forest mb-1">Review process</h3>
-                      <p className="text-forest/60 text-sm">
-                        Our team will review your application within 3-5 business days. 
-                        You'll receive another email once a decision has been made.
-                      </p>
-                    </div>
-                  </div>
+                <div className="space-y-2">
+                  <span className="text-forest/40 font-bold uppercase tracking-[0.4em] text-[10px] block">
+                    VentureHub · Investors
+                  </span>
+                  <h1 className="font-serif text-3xl sm:text-4xl text-forest leading-tight">
+                    Account Created <span className="italic">Successfully</span>
+                  </h1>
+                  <p className="text-forest/60 text-sm sm:text-base leading-relaxed max-w-sm mx-auto">
+                    Welcome to VentureHub. Your investor account is ready to use — no waiting, no approval required.
+                  </p>
                 </div>
               </div>
 
-              {/* Next steps */}
-              <div className="pt-6 border-t border-forest/10">
-                <h2 className="font-serif text-2xl text-forest mb-6">While you wait</h2>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <button
-                    onClick={() => window.open("https://docs.venturehub.com", "_blank")}
-                    className="text-left p-4 border border-forest/10 hover:border-forest/30 rounded-lg transition-colors group"
-                  >
-                    <h3 className="font-bold text-forest mb-1 group-hover:text-forest/80">Read our docs</h3>
-                    <p className="text-xs text-forest/40">Learn more about the platform</p>
-                  </button>
-                  <button
-                    onClick={() => router.push("/startups/guide")}
-                    className="text-left p-4 border border-forest/10 hover:border-forest/30 rounded-lg transition-colors group"
-                  >
-                    <h3 className="font-bold text-forest mb-1 group-hover:text-forest/80">Founder's guide</h3>
-                    <p className="text-xs text-forest/40">Tips for a successful journey</p>
-                  </button>
-                </div>
+              {/* ── Divider ── */}
+              <div className="border-t border-forest/8" />
+
+              {/* ── 2. WHAT HAPPENS NEXT ── */}
+              <div className="space-y-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-forest/40">
+                  You can now
+                </p>
+                <ul className="space-y-2.5">
+                  {[
+                    "Explore startups tailored to your investment interests",
+                    "Express interest in promising early-stage opportunities",
+                    "Start conversations directly with founders",
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-start gap-3">
+                      <div className="w-5 h-5 rounded-full bg-forest/8 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-[10px] font-bold text-forest/60">{i + 1}</span>
+                      </div>
+                      <span className="text-sm text-forest/70 leading-relaxed">{item}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
 
-              {/* Check status button */}
-              <div className="pt-6">
-                <button
-                  onClick={() => router.push(`/apply/status?email=${encodeURIComponent(email)}`)}
-                  className="w-full sm:w-auto px-8 py-4 bg-forest text-white font-bold uppercase text-xs tracking-[0.2em] hover:bg-forest/90 transition-colors flex items-center justify-center gap-2 mx-auto"
+              {/* ── 3 & 4. CTAs ── */}
+              <div className="flex flex-col gap-3">
+                {/* Primary CTA */}
+                <Link
+                  href="/dashboard/investor/discover"
+                  className="group flex items-center justify-center gap-2 w-full bg-forest text-white px-6 py-3.5 rounded-xl font-bold uppercase text-xs tracking-[0.15em] hover:bg-forest/90 transition-colors shadow-sm shadow-forest/10"
                 >
-                  Check Application Status
-                  <ArrowRight className="w-4 h-4" />
-                </button>
+                  <LayoutDashboard className="w-3.5 h-3.5" />
+                  Go to Dashboard
+                  <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+                </Link>
+
+                {/* Secondary CTA */}
+                <Link
+                  href="/dashboard/investor/profile"
+                  className="flex items-center justify-center gap-2 w-full border border-forest/20 text-forest px-6 py-3.5 rounded-xl font-bold uppercase text-xs tracking-[0.15em] hover:bg-beige transition-colors"
+                >
+                  <UserCircle className="w-3.5 h-3.5" />
+                  Complete Your Profile
+                </Link>
               </div>
+
+              {/* ── 5. PROFILE COMPLETION HINT ── */}
+              <div className="bg-amber-50/60 border border-amber-200/60 rounded-xl px-4 py-3 flex items-start gap-3">
+                <div className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0 mt-1.5" />
+                <p className="text-xs text-amber-800/80 leading-relaxed">
+                  <span className="font-semibold">Tip:</span> Completing your investor profile helps us surface startups that match your thesis, stage preference, and sector focus.
+                </p>
+              </div>
+
+              {/* ── Divider ── */}
+              <div className="border-t border-forest/8" />
+
+              {/* ── 6. TRUST ELEMENT ── */}
+              <div className="flex items-center justify-center gap-2 text-center">
+                <Lock className="w-3 h-3 text-forest/30 flex-shrink-0" />
+                <p className="text-[10px] text-forest/35 leading-relaxed">
+                  Your information is securely stored and used only to improve your experience.
+                </p>
+              </div>
+
             </div>
           </div>
+
+          {/* ── 7. BACK LINK ── */}
+          <div className="mt-6 text-center">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.2em] text-forest/40 hover:text-forest transition-colors"
+            >
+              <Home className="w-3 h-3" />
+              Back to Home
+            </Link>
+          </div>
+
         </div>
       </main>
 
       <Footer />
+
+      <style jsx>{`
+        @keyframes ping {
+          75%, 100% { transform: scale(1.5); opacity: 0; }
+        }
+        .animate-ping {
+          animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+      `}</style>
     </div>
   );
 }

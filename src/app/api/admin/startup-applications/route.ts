@@ -210,16 +210,13 @@ export async function GET(req: NextRequest) {
   }
 }
 
-
-// Add this near the top of route.ts, before the handlers
+// ── Helpers ────────────────────────────────────────────────────────────────
 function parseCapital(value: string | null | undefined): string | null {
   if (!value) return null;
-  // Strip currency prefix (e.g. "INR ", "USD ") and commas
   const cleaned = value.replace(/[^0-9.]/g, "").trim();
   if (!cleaned) return null;
   const num = parseFloat(cleaned);
   if (isNaN(num)) return null;
-  // Clamp to decimal(15,2) max: 9_999_999_999_999.99
   return Math.min(num, 9_999_999_999_999.99).toFixed(2);
 }
 
@@ -249,15 +246,13 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Application not found" }, { status: 404 });
     }
 
-    if (application.status === "APPROVED") {
-      return NextResponse.json({ error: "Application already approved" }, { status: 409 });
-    }
     if (application.status === "REJECTED") {
       return NextResponse.json({ error: "Application already rejected" }, { status: 409 });
     }
 
     const now = new Date();
 
+    // ── under_review ────────────────────────────────────────────────────────
     if (action === "under_review") {
       await db.update(StartupApplicationsTable).set({
         status: "UNDER_REVIEW",
@@ -277,6 +272,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: true, status: "UNDER_REVIEW" });
     }
 
+    // ── reject ──────────────────────────────────────────────────────────────
     if (action === "reject") {
       await db.update(StartupApplicationsTable).set({
         status: "REJECTED",
@@ -296,7 +292,44 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: true, status: "REJECTED" });
     }
 
+    // ── approve ─────────────────────────────────────────────────────────────
     if (action === "approve") {
+      // ── FIX: Handle already-approved and partial-failure cases ─────────────
+      //
+      // The previous code had a hard 409 guard on `status === "APPROVED"` AND
+      // a separate hard 409 when an existing user was found. This caused two
+      // failure modes:
+      //
+      // 1. Transaction partial failure: the DB transaction committed the INSERT
+      //    into UsersTable + StartupProfilesTable but then failed to UPDATE
+      //    StartupApplicationsTable (network drop, timeout, etc.).  The
+      //    application row is still SUBMITTED/UNDER_REVIEW, so the status guard
+      //    passes — but the email-uniqueness check fires a 409.
+      //
+      // 2. Admin double-click / retry: application is already APPROVED, but the
+      //    UI didn't refresh in time and the admin clicked Approve again.
+      //
+      // Fix strategy:
+      //   a) If the application is already APPROVED → idempotent 200, no-op.
+      //   b) If a user exists and it was created by THIS application
+      //      (application.createdUserId === existingUser.id) → the transaction
+      //      previously half-succeeded; reconcile by stamping the application
+      //      row APPROVED and returning success.
+      //   c) If a user exists but belongs to a different account → genuine
+      //      email conflict, return 409 with a clear message.
+      //   d) Happy path: no existing user → run the full transaction as before.
+      // ──────────────────────────────────────────────────────────────────────
+
+      // Case (a): already fully approved — idempotent success
+      if (application.status === "APPROVED") {
+        return NextResponse.json({
+          success: true,
+          status: "APPROVED",
+          userId: application.createdUserId,
+          idempotent: true,
+        });
+      }
+
       const [existingUser] = await db
         .select({ id: UsersTable.id })
         .from(UsersTable)
@@ -304,12 +337,36 @@ export async function PATCH(req: NextRequest) {
         .limit(1);
 
       if (existingUser) {
+        // Case (b): partial transaction failure — reconcile
+        if (application.createdUserId === existingUser.id) {
+          await db.update(StartupApplicationsTable).set({
+            status:      "APPROVED",
+            reviewedBy:  admin.id,
+            reviewNotes: reviewNotes || null,
+            reviewedAt:  now,
+            updatedAt:   now,
+          }).where(eq(StartupApplicationsTable.id, id));
+
+          console.warn(
+            `[approve] Reconciled partial failure for application ${id} — user ${existingUser.id} already existed`
+          );
+
+          return NextResponse.json({
+            success: true,
+            status: "APPROVED",
+            userId: existingUser.id,
+            recovered: true,
+          });
+        }
+
+        // Case (c): genuine email conflict with a different account
         return NextResponse.json(
-          { error: "A user with this email already exists" },
+          { error: "A user with this email already exists under a different account" },
           { status: 409 }
         );
       }
 
+      // Case (d): happy path — create user + profile atomically
       const tempPassword       = generateTempPassword();
       const hashedTempPassword = await bcrypt.hash(tempPassword, 10);
       const newUserId          = randomUUID();
@@ -330,21 +387,20 @@ export async function PATCH(req: NextRequest) {
         });
 
         await tx.insert(StartupProfilesTable).values({
-          userId:              newUserId,
-          companyName:         application.companyName,
-          websiteUrl:          application.websiteUrl          || null,
-          sector:              application.sector,
-          stage:               application.stage,
-          country:             application.country             || null,
-          impactDescription:   application.impactDescription   || null,
-          useOfFunds:          application.useOfFunds          || null,
-          // fundingAskMin:       application.capitalRequested    || null,
-          approvalStatus:      "APPROVED",
-          profileScore:        10,
-          founders:            [],
-          sdgGoals:            [],
-          createdAt:           now,
-          updatedAt:           now,
+          userId:            newUserId,
+          companyName:       application.companyName,
+          websiteUrl:        application.websiteUrl        || null,
+          sector:            application.sector,
+          stage:             application.stage,
+          country:           application.country           || null,
+          impactDescription: application.impactDescription || null,
+          useOfFunds:        application.useOfFunds        || null,
+          approvalStatus:    "APPROVED",
+          profileScore:      10,
+          founders:          [],
+          sdgGoals:          [],
+          createdAt:         now,
+          updatedAt:         now,
         });
 
         await tx.update(StartupApplicationsTable).set({
