@@ -56,7 +56,7 @@ export default function InvestorApplyPage() {
   const [errs,  setErrs]  = useState<Record<string, string>>({});
   const [warns, setWarns] = useState<Record<string, string>>({});
   const [oks,   setOks]   = useState<Record<string, string>>({});
-
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false); 
   const [form, setForm] = useState({
     name:                 "",
     email:                "",
@@ -284,12 +284,43 @@ export default function InvestorApplyPage() {
     } catch {}
   };
 
-  const handleNext = () => {
-    if (validateStep(currentStep)) {
-      saveDraft();
-      setCurrentStep(p => p + 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+  const handleNext = async () => {
+    if (!validateStep(currentStep)) return;
+
+    // Check email uniqueness before leaving step 0
+    if (currentStep === 0) {
+      try {
+        setIsCheckingEmail(true);
+        const res = await fetch("/api/investors/check-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: form.email }),
+        });
+
+
+        if (!res.ok) {
+          toast({
+            title: "Error",
+            description: "This email is already registered.",
+            variant: "destructive",
+          });
+          return;
+        }
+      } catch {
+        toast({
+          title: "Network error",
+          description: "Couldn't verify your email. Check your connection and try again.",
+          variant: "destructive",
+        });
+        return;
+      } finally {
+          setIsCheckingEmail(false);
+      }
     }
+
+    saveDraft();
+    setCurrentStep(p => p + 1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handlePrevious = () => {
@@ -825,9 +856,12 @@ export default function InvestorApplyPage() {
                         </button>
                       )}
                       {currentStep < steps.length - 1 ? (
-                        <button type="button" onClick={handleNext}
-                          className="flex items-center gap-1.5 px-6 py-3 bg-forest text-white font-bold uppercase text-xs tracking-[0.15em] hover:bg-forest/90 transition-colors rounded-lg shadow-sm shadow-forest/10">
-                          Continue<ChevronRight className="w-3.5 h-3.5" />
+                        <button type="button" onClick={handleNext} disabled={isCheckingEmail}
+                          className="flex items-center gap-1.5 px-6 py-3 bg-forest text-white font-bold uppercase text-xs tracking-[0.15em] hover:bg-forest/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-sm shadow-forest/10">
+                          {isCheckingEmail
+                            ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Checking…</>
+                            : <>Continue<ChevronRight className="w-3.5 h-3.5" /></>
+                          }
                         </button>
                       ) : (
                         <button type="button" onClick={handleSubmit} disabled={isSubmitting}
