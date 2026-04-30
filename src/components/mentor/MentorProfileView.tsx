@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import {
   Briefcase,
   MapPin,
@@ -131,16 +132,17 @@ function AvailabilityDisplay({ slots }: { slots: MentorAvailability[] }) {
   );
 }
 
-// ─── Avatar placeholder ───────────────────────────────────────────────
+// ─── Avatar ───────────────────────────────────────────────────────────
 function Avatar({ name, url, size = 80 }: { name: string; url: string | null; size?: number }) {
   const initials = name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
   if (url) {
     return (
-      <img
+      <Image
         src={url}
         alt={name}
-        className="object-cover"
-        style={{ width: size, height: size }}
+        width={size}
+        height={size}
+        className="object-cover flex-shrink-0"
       />
     );
   }

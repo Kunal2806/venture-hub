@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,7 +72,15 @@ function deriveStatus(req: ExistingRequest | null): RequestStatus {
 function Avatar({ name, avatarUrl, size = "lg" }: { name: string; avatarUrl: string | null; size?: "sm" | "lg" }) {
   const dim = size === "lg" ? "w-[72px] h-[72px] text-2xl" : "w-10 h-10 text-sm"
   if (avatarUrl) {
-    return <img src={avatarUrl} alt={name} className={`${dim} rounded-full object-cover flex-shrink-0`} />
+    return (
+      <Image
+        src={avatarUrl}
+        alt={name}
+        width={size === "lg" ? 72 : 40}
+        height={size === "lg" ? 72 : 40}
+        className={`${dim} rounded-full object-cover flex-shrink-0`}
+      />
+    )
   }
   return (
     <div className={`${dim} rounded-full bg-[var(--forest)] flex items-center justify-center font-serif text-[var(--cream)] flex-shrink-0 font-semibold`}>

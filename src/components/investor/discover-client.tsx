@@ -175,7 +175,11 @@ export default function DiscoverClient({ startups, sentStartupIds }: Props) {
   function toggleStage(stage: string) {
     setActiveStages((prev) => {
       const next = new Set(prev)
-      next.has(stage) ? next.delete(stage) : next.add(stage)
+      if (next.has(stage)) {
+        next.delete(stage)
+      } else {
+        next.add(stage)
+      }
       return next
     })
   }
@@ -183,7 +187,11 @@ export default function DiscoverClient({ startups, sentStartupIds }: Props) {
   function toggleSector(sector: string) {
     setActiveSectors((prev) => {
       const next = new Set(prev)
-      next.has(sector) ? next.delete(sector) : next.add(sector)
+      if (next.has(sector)) {
+        next.delete(sector)
+      } else {
+        next.add(sector)
+      }
       return next
     })
   }
@@ -898,7 +906,7 @@ export default function DiscoverClient({ startups, sentStartupIds }: Props) {
                       padding: "16px 24px",
                       borderTop: "1px solid rgba(26,54,43,0.07)",
                       display: "flex",
-                      alignItems: "center",
+                        alignItems: "center",
                       justifyContent: "space-between",
                       gap: "12px",
                       backgroundColor: "rgba(249,247,242,0.5)",
