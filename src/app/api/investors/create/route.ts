@@ -184,7 +184,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 6. Send welcome email (non-fatal)
-  const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL}/auth/login`
+  const loginUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/login`
   let emailSent = false
   try {
     await sendEmail(

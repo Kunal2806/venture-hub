@@ -21,7 +21,7 @@ export default async function StartupChatPage({ params }: PageProps) {
   const userId = session.user.id as string;
   const { conversationId } = await params;
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
   const cookieStore = await cookies();
 
   let messages: MessageWithSender[] = [];
