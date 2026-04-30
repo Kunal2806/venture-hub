@@ -22,7 +22,7 @@ import {
 } from "@/components/investor/types-constants";
 import { FieldError, FieldWarn, FieldOk, CharCount, PasswordStrength, Tooltip, MultiToggle } from "@/components/investor/ui-components";
 import { InvestorTypeDropdown, PhoneCountryDropdown, TicketAmountInput } from "@/components/investor/input-components";
-
+import { useToast } from "@/hooks/use-toast";
 // ─── Step field maps ───────────────────────────────────────────────────────────
 
 const STEP_FIELDS: Record<number, string[]> = {
@@ -37,6 +37,7 @@ const STEP_FIELDS: Record<number, string[]> = {
 
 export default function InvestorApplyPage() {
   const router = useRouter();
+  const { toast } = useToast();
 
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -357,13 +358,13 @@ export default function InvestorApplyPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        if (res.status === 429) throw new Error("Too many requests. Please wait a moment and try again.");
-        if (res.status === 409) throw new Error("An account with this email already exists.");
-        if (res.status === 422 && data.errors) {
-          const msgs = Object.values(data.errors as Record<string, string>).join("\n");
-          throw new Error(msgs);
-        }
-        throw new Error(data.message || "Something went wrong. Please try again.");
+        toast({
+          title: "Error submitting application",
+          description: data.message,
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
       }
       try {
         sessionStorage.removeItem("vh-investor-apply-draft");
