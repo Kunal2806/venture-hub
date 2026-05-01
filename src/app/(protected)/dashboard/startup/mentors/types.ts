@@ -44,13 +44,12 @@ export interface Mentor {
 
 // ── Session request payload (POST /api/mentor-sessions body) ─────────────
 export interface CreateSessionPayload {
-  mentorProfileId: string;           // MentorProfilesTable.id
+  mentorProfileId: string;          
   topic: string;
   description?: string;
   format?: SessionFormat;
 }
 
-// ── Session (GET /api/mentor-sessions response item) ─────────────────────
 export interface MentorSessionItem {
   id: string;
   status: SessionStatus;
@@ -68,12 +67,15 @@ export interface MentorSessionItem {
   mentorHeadline: string | null;
   mentorName: string;
   mentorAvatar: string | null;
+  startupId?: string;
+  startupName?: string | null;
+  startupLogo?: string | null;
 }
 
 // ── Client-side filter state (FilterPanel) ───────────────────────────────
 export interface FilterState {
   search: string;
-  expertise: string[];               // maps to ?domains[]=
+  expertise: string[];               
   engagementType: EngagementType | "";
   sortBy: "rating" | "experience" | "";
 }
