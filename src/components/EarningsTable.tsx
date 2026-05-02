@@ -1,20 +1,12 @@
-import { Video, FileText, MapPin } from "lucide-react";
+import { Video, FileText, MapPin, type LucideIcon } from "lucide-react";
 import type { SessionFormat } from "@/app/(protected)/dashboard/startup/mentors/types";
 
-const FOREST = "#1A362B";
-const BEIGE = "#EFEBE3";
-const CREAM = "#F9F7F2";
+type FormatCfg = { label: string; icon: LucideIcon };
 
-const FORMAT_ICON: Record<SessionFormat, React.ElementType> = {
-  VIDEO_CALL:   Video,
-  ASYNC_REVIEW: FileText,
-  IN_PERSON:    MapPin,
-};
-
-const FORMAT_LABEL: Record<SessionFormat, string> = {
-  VIDEO_CALL:   "Video Call",
-  ASYNC_REVIEW: "Async Review",
-  IN_PERSON:    "In Person",
+const FORMAT_CFG: Record<string, FormatCfg> = {
+  VIDEO_CALL:   { label: "Video Call",   icon: Video    },
+  ASYNC_REVIEW: { label: "Async Review", icon: FileText },
+  IN_PERSON:    { label: "In Person",    icon: MapPin   },
 };
 
 export interface EarningRow {
@@ -24,7 +16,7 @@ export interface EarningRow {
   topic: string;
   format: SessionFormat;
   grossUsd: string;
-  mentorEarnings: string | null;
+  mentorEarnings: string | null; 
 }
 
 interface EarningsTableProps {
@@ -35,9 +27,9 @@ interface EarningsTableProps {
 export function EarningsTable({ rows, loading }: EarningsTableProps) {
   if (loading) {
     return (
-      <div className="bg-white rounded-xl border p-6 space-y-3" style={{ borderColor: `${FOREST}12` }}>
+      <div className="bg-white rounded-xl border border-stone-100 p-6 space-y-3">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-12 rounded-lg animate-pulse" style={{ backgroundColor: CREAM }} />
+          <div key={i} className="h-12 rounded-lg animate-pulse bg-stone-50" />
         ))}
       </div>
     );
@@ -45,77 +37,61 @@ export function EarningsTable({ rows, loading }: EarningsTableProps) {
 
   if (rows.length === 0) {
     return (
-      <div
-        className="bg-white rounded-xl border p-12 text-center"
-        style={{ borderColor: `${FOREST}12` }}
-      >
-        <p className="text-sm" style={{ color: `${FOREST}55` }}>No completed paid sessions yet.</p>
+      <div className="bg-white rounded-xl border border-stone-100 p-12 text-center">
+        <p className="text-sm text-stone-400">No completed paid sessions yet.</p>
       </div>
     );
   }
 
   return (
-    <div
-      className="bg-white rounded-xl border overflow-hidden"
-      style={{ borderColor: `${FOREST}12` }}
-    >
-      {/* Table header */}
-      <div
-        className="grid grid-cols-12 gap-4 px-5 py-3 text-xs font-semibold uppercase tracking-wider border-b"
-        style={{ backgroundColor: CREAM, color: `${FOREST}60`, borderColor: `${FOREST}10` }}
-      >
+    <div className="bg-white rounded-xl border border-stone-100 overflow-hidden">
+      {/* Header */}
+      <div className="grid grid-cols-12 gap-4 px-5 py-3 text-xs font-semibold uppercase tracking-wider border-b border-stone-100 bg-stone-50 text-stone-400">
         <div className="col-span-2">Date</div>
         <div className="col-span-4">Session</div>
         <div className="col-span-3">Startup</div>
         <div className="col-span-2 text-right">Gross</div>
-        <div className="col-span-1 text-right">You Earn</div>
+        <div className="col-span-1 text-right">Payout</div>
       </div>
 
       {/* Rows */}
-      <div className="divide-y" style={{ borderColor: `${FOREST}08` }}>
+      <div className="divide-y divide-stone-50">
         {rows.map(row => {
-          const FormatIcon = FORMAT_ICON[row.format];
-          const displayEarnings = row.mentorEarnings ?? row.grossUsd;
+          const cfg            = FORMAT_CFG[row.format];
+          const FormatIcon     = cfg.icon;
+          const payout         = row.mentorEarnings ?? row.grossUsd;
 
           return (
             <div
               key={row.id}
-              className="grid grid-cols-12 gap-4 px-5 py-4 items-center hover:bg-[#F9F7F2] transition-colors"
+              className="grid grid-cols-12 gap-4 px-5 py-4 items-center hover:bg-stone-50 transition-colors"
             >
-              {/* Date */}
-              <div className="col-span-2 text-xs" style={{ color: `${FOREST}70` }}>
+              <div className="col-span-2 text-xs text-stone-500">
                 {new Date(row.date).toLocaleDateString("en-IN", {
                   day: "numeric", month: "short", year: "2-digit",
                 })}
               </div>
 
-              {/* Session */}
               <div className="col-span-4">
-                <p className="text-sm font-medium truncate" style={{ color: FOREST }}>
+                <p className="text-sm font-medium truncate text-stone-800">
                   {row.topic}
                 </p>
-                <span
-                  className="flex items-center gap-1 text-xs mt-0.5 w-fit"
-                  style={{ color: `${FOREST}55` }}
-                >
+                <span className="flex items-center gap-1 text-xs mt-0.5 text-stone-400">
                   <FormatIcon className="w-3 h-3" />
-                  {FORMAT_LABEL[row.format]}
+                  {cfg.label}
                 </span>
               </div>
 
-              {/* Startup */}
-              <div className="col-span-3 text-sm truncate" style={{ color: `${FOREST}80` }}>
+              <div className="col-span-3 text-sm truncate text-stone-600">
                 {row.startupName}
               </div>
 
-              {/* Gross */}
-              <div className="col-span-2 text-sm text-right font-medium" style={{ color: `${FOREST}70` }}>
+              <div className="col-span-2 text-sm text-right font-medium text-stone-500">
                 ${parseFloat(row.grossUsd).toFixed(2)}
               </div>
 
-              {/* Earnings */}
-              <div className="col-span-1 text-sm text-right font-semibold" style={{ color: FOREST }}>
-                ${parseFloat(displayEarnings).toFixed(2)}
+              <div className="col-span-1 text-sm text-right font-semibold text-stone-800">
+                ${parseFloat(payout).toFixed(2)}
               </div>
             </div>
           );

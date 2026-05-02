@@ -70,6 +70,8 @@ export interface MentorSessionItem {
   startupId?: string;
   startupName?: string | null;
   startupLogo?: string | null;
+  mentorEarnings: string | null;    
+  platformCommission: string | null;
 }
 
 // ── Client-side filter state (FilterPanel) ───────────────────────────────

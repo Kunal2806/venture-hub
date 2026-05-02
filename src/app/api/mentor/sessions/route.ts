@@ -5,6 +5,7 @@ import {
   MentorProfilesTable,
   StartupProfilesTable,
   UsersTable,
+  PlatformConfigTable
 } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { auth } from "@/auth";
@@ -67,6 +68,8 @@ export async function GET(req: NextRequest) {
         startupId:       StartupProfilesTable.id,
         startupName:     UsersTable.name,
         startupLogo:     UsersTable.avatarUrl,
+        mentorEarnings:      MentorSessionsTable.mentorEarnings,
+        platformCommission:  MentorSessionsTable.platformCommission,
       })
       .from(MentorSessionsTable)
       .innerJoin(
@@ -147,6 +150,26 @@ export async function PATCH(req: NextRequest) {
     if (body.status === "COMPLETED") {
       updatePayload.completedAt = now;
       if (body.sessionNotes) updatePayload.sessionNotes = body.sessionNotes;
+
+      const [config] = await db
+        .select({ value: PlatformConfigTable.value })
+        .from(PlatformConfigTable)
+        .where(eq(PlatformConfigTable.key, "mentor_commission_percent"))
+        .limit(1);
+
+      const [sessionRow] = await db
+        .select({ amountUsd: MentorSessionsTable.amountUsd })
+        .from(MentorSessionsTable)
+        .where(eq(MentorSessionsTable.id, body.id))
+        .limit(1);
+
+      if (config && sessionRow) {
+        const gross      = parseFloat(sessionRow.amountUsd);
+        const commission = gross * (parseFloat(config.value) / 100);
+        const earnings   = gross - commission;
+        updatePayload.platformCommission = commission.toFixed(2);
+        updatePayload.mentorEarnings     = earnings.toFixed(2);
+      }
     }
 
     if (body.status === "RESCHEDULED") {

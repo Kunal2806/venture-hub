@@ -19,6 +19,7 @@ import {
   BarChart3,
   Settings,
   X,
+  Globe,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -143,6 +144,13 @@ const NAV_ITEMS: NavItem[] = [
     href: "/dashboard/mentor/earnings",
     label: "Earnings",
     icon: <DollarSign className="h-4 w-4" />,
+    roles: ["MENTOR"],
+    group: "mentor",
+  },
+  {
+    href: "/dashboard/mentor/startups",
+    label: "Browse Startups",
+    icon: <Globe className="h-4 w-4" />,
     roles: ["MENTOR"],
     group: "mentor",
   },

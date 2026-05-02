@@ -191,3 +191,145 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+  
+export async function PATCH(req: NextRequest) {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const userId = session.user.id as string;
+    const { id, status } = await req.json() as {
+      id: string;
+      status: "ACCEPTED" | "CANCELLED";
+    };
+
+    if (!id) {
+      return NextResponse.json({ error: "id is required" }, { status: 400 });
+    }
+
+    const [startupProfile] = await db
+      .select({ id: StartupProfilesTable.id })
+      .from(StartupProfilesTable)
+      .where(eq(StartupProfilesTable.userId, userId))
+      .limit(1);
+
+    if (!startupProfile) {
+      return NextResponse.json(
+        { error: "Startup profile not found" },
+        { status: 404 }
+      );
+    }
+
+    if (status === "ACCEPTED") {
+      const [existing] = await db
+        .select({
+          status: MentorSessionsTable.status,
+          amountUsd: MentorSessionsTable.amountUsd,
+        })
+        .from(MentorSessionsTable)
+        .where(
+          and(
+            eq(MentorSessionsTable.id, id),
+            eq(MentorSessionsTable.startupId, startupProfile.id)
+          )
+        )
+        .limit(1);
+
+      if (!existing) {
+        return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      }
+
+      if (existing.status !== "REQUESTED") {
+        return NextResponse.json(
+          { error: "Can only accept REQUESTED sessions" },
+          { status: 409 }
+        );
+      }
+
+      if (parseFloat(existing.amountUsd) !== 0) {
+        return NextResponse.json(
+          { error: "Only pro-bono sessions can be accepted" },
+          { status: 400 }
+        );
+      }
+
+      const [updated] = await db
+        .update(MentorSessionsTable)
+        .set({
+          status: "ACCEPTED",
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(MentorSessionsTable.id, id),
+            eq(MentorSessionsTable.startupId, startupProfile.id)
+          )
+        )
+        .returning();
+
+      return NextResponse.json({ data: updated });
+    }
+
+    // ── CANCEL ───────────────────────────────────────────────────
+    if (status === "CANCELLED") {
+      const [existing] = await db
+        .select({
+          status: MentorSessionsTable.status,
+        })
+        .from(MentorSessionsTable)
+        .where(
+          and(
+            eq(MentorSessionsTable.id, id),
+            eq(MentorSessionsTable.startupId, startupProfile.id)
+          )
+        )
+        .limit(1);
+
+      if (!existing) {
+        return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      }
+
+      if (existing.status !== "REQUESTED") {
+        return NextResponse.json(
+          {
+            error: `Cannot cancel a session with status ${existing.status}`,
+          },
+          { status: 409 }
+        );
+      }
+
+      const [updated] = await db
+        .update(MentorSessionsTable)
+        .set({
+          status: "CANCELLED",
+          cancelledAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(MentorSessionsTable.id, id),
+            eq(MentorSessionsTable.startupId, startupProfile.id)
+          )
+        )
+        .returning();
+
+      return NextResponse.json({ data: updated });
+    }
+
+    // ── fallback ─────────────────────────────────────────────────
+    return NextResponse.json(
+      { error: "Invalid status value" },
+      { status: 400 }
+    );
+
+  } catch (error) {
+    console.error("[PATCH /api/mentor-sessions]", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
