@@ -11,13 +11,13 @@ import {
 const FOREST = "#1A362B";
 
 const STAGES = [
-  { value: "",         label: "All Stages"  },
-  { value: "IDEA",     label: "Idea"        },
-  { value: "PRE_SEED", label: "Pre-Seed"    },
-  { value: "SEED",     label: "Seed"        },
-  { value: "SERIES_A", label: "Series A"    },
-  { value: "SERIES_B", label: "Series B"    },
-  { value: "GROWTH",   label: "Growth"      },
+  { value: "", label: "All Stages" },
+  { value: "IDEA", label: "Idea" },
+  { value: "PRE_SEED", label: "Pre-Seed" },
+  { value: "SEED", label: "Seed" },
+  { value: "SERIES_A", label: "Series A" },
+  { value: "SERIES_B", label: "Series B" },
+  { value: "GROWTH", label: "Growth" },
 ];
 
 interface Startup {
@@ -33,17 +33,16 @@ interface Startup {
   isFeatured: boolean;
   logoUrl: string | null;
   founderName: string;
+  existingProBonoStatus: string | null; // 👈 added
 }
 
 export default function MentorBrowseStartupsPage() {
-  const [startups,  setStartups]  = useState<Startup[]>([]);
-  const [loading,   setLoading]   = useState(true);
-  const [search,    setSearch]    = useState("");
-  const [sector,    setSector]    = useState("");
-  const [stage,     setStage]     = useState("");
-  // Track offered startups in this session
-  const [offered,   setOffered]   = useState<Set<string>>(new Set());
-  const [offering,  setOffering]  = useState<string | null>(null);
+  const [startups, setStartups] = useState<Startup[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [sector, setSector] = useState("");
+  const [stage, setStage] = useState("");
+  const [offering, setOffering] = useState<string | null>(null);
   const [offerError, setOfferError] = useState<string | null>(null);
 
   const fetchStartups = useCallback(async () => {
@@ -52,8 +51,8 @@ export default function MentorBrowseStartupsPage() {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
       if (sector) params.set("sector", sector);
-      if (stage)  params.set("stage",  stage);
-      const res  = await fetch(`/api/mentor/startups?${params.toString()}`);
+      if (stage) params.set("stage", stage);
+      const res = await fetch(`/api/mentor/startups?${params.toString()}`);
       const json = await res.json();
       setStartups(json.data ?? []);
     } catch {
@@ -64,7 +63,7 @@ export default function MentorBrowseStartupsPage() {
   }, [search, sector, stage]);
 
   useEffect(() => {
-    const t = setTimeout(fetchStartups, 300); // debounce search
+    const t = setTimeout(fetchStartups, 300);
     return () => clearTimeout(t);
   }, [fetchStartups]);
 
@@ -73,13 +72,21 @@ export default function MentorBrowseStartupsPage() {
     setOfferError(null);
     try {
       const res = await fetch("/api/mentor/probo-offer", {
-        method:  "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ startupProfileId: startupId }),
+        body: JSON.stringify({ startupProfileId: startupId }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Failed to send offer");
-      setOffered(prev => new Set([...prev, startupId]));
+
+      // Update local state
+      setStartups(prev =>
+        prev.map(s =>
+          s.id === startupId
+            ? { ...s, existingProBonoStatus: "REQUESTED" }
+            : s
+        )
+      );
     } catch (e) {
       setOfferError(e instanceof Error ? e.message : "Something went wrong");
     } finally {
@@ -87,7 +94,6 @@ export default function MentorBrowseStartupsPage() {
     }
   }
 
-  // Unique sectors from loaded data
   const sectors = Array.from(new Set(startups.map(s => s.sector))).sort();
 
   return (
@@ -111,7 +117,6 @@ export default function MentorBrowseStartupsPage() {
 
       {/* Filters */}
       <div className="bg-white rounded-xl border border-stone-100 p-4 flex flex-wrap gap-3 items-center">
-        {/* Search */}
         <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
           <input
@@ -127,7 +132,6 @@ export default function MentorBrowseStartupsPage() {
           )}
         </div>
 
-        {/* Stage filter */}
         <select
           value={stage}
           onChange={e => setStage(e.target.value)}
@@ -138,7 +142,6 @@ export default function MentorBrowseStartupsPage() {
           ))}
         </select>
 
-        {/* Sector filter — dynamic from data */}
         {sectors.length > 0 && (
           <select
             value={sector}
@@ -152,7 +155,6 @@ export default function MentorBrowseStartupsPage() {
           </select>
         )}
 
-        {/* Active filter count */}
         {(search || sector || stage) && (
           <button
             onClick={() => { setSearch(""); setSector(""); setStage(""); }}
@@ -163,14 +165,12 @@ export default function MentorBrowseStartupsPage() {
         )}
       </div>
 
-      {/* Error */}
       {offerError && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {offerError}
         </div>
       )}
 
-      {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-24">
           <Loader2 className="w-7 h-7 animate-spin text-stone-300" />
@@ -183,19 +183,14 @@ export default function MentorBrowseStartupsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {startups.map(startup => {
-            const isOffered  = offered.has(startup.id);
-            const isOffering = offering === startup.id;
-            return (
-              <StartupCard
-                key={startup.id}
-                startup={startup}
-                isOffered={isOffered}
-                isOffering={isOffering}
-                onOffer={() => handleOffer(startup.id)}
-              />
-            );
-          })}
+          {startups.map(startup => (
+            <StartupCard
+              key={startup.id}
+              startup={startup}
+              isOffering={offering === startup.id}
+              onOffer={() => handleOffer(startup.id)}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -206,12 +201,10 @@ export default function MentorBrowseStartupsPage() {
 
 function StartupCard({
   startup,
-  isOffered,
   isOffering,
   onOffer,
 }: {
   startup: Startup;
-  isOffered: boolean;
   isOffering: boolean;
   onOffer: () => void;
 }) {
@@ -221,20 +214,70 @@ function StartupCard({
   const location = [startup.city, startup.country].filter(Boolean).join(", ");
 
   const STAGE_LABEL: Record<string, string> = {
-    IDEA:     "Idea",
+    IDEA: "Idea",
     PRE_SEED: "Pre-Seed",
-    SEED:     "Seed",
+    SEED: "Seed",
     SERIES_A: "Series A",
     SERIES_B: "Series B",
     SERIES_C: "Series C",
-    GROWTH:   "Growth",
+    GROWTH: "Growth",
   };
+
+  const getButtonConfig = () => {
+    const status = startup.existingProBonoStatus;
+
+    if (!status) {
+      return {
+        text: "I want to help",
+        icon: Heart,
+        bgColor: FOREST,
+        textColor: "text-white",
+        showStatus: false,
+      };
+    }
+
+    switch (status) {
+      case "REQUESTED":
+        return {
+          text: "Offer Pending",
+          icon: Loader2,
+          bgColor: "#F3F4F6",
+          textColor: "text-stone-500",
+          showStatus: true,
+        };
+      case "ACCEPTED":
+        return {
+          text: "Offer Accepted",
+          icon: CheckCircle2,
+          bgColor: "#ECFDF5",
+          textColor: "text-emerald-700",
+          showStatus: true,
+        };
+      case "DECLINED":
+        return {
+          text: "Offer Declined",
+          icon: X,
+          bgColor: "#FEF2F2",
+          textColor: "text-red-700",
+          showStatus: true,
+        };
+      default:
+        return {
+          text: "Offer Sent",
+          icon: CheckCircle2,
+          bgColor: "#ECFDF5",
+          textColor: "text-emerald-700",
+          showStatus: true,
+        };
+    }
+  };
+
+  const buttonConfig = getButtonConfig();
+  const ButtonIcon = buttonConfig.icon;
 
   return (
     <div className="bg-white rounded-xl border border-stone-100 p-5 flex flex-col gap-4 hover:shadow-sm transition-shadow">
-      {/* Header */}
       <div className="flex items-start gap-3">
-        {/* Logo / initials */}
         <div
           className="w-10 h-10 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0"
           style={{ backgroundColor: FOREST }}
@@ -262,23 +305,19 @@ function StartupCard({
         </div>
       </div>
 
-      {/* Description */}
       {startup.description && (
         <p className="text-xs text-stone-500 line-clamp-2 leading-relaxed">
           {startup.description}
         </p>
       )}
 
-      {/* Meta chips */}
       <div className="flex flex-wrap gap-2">
         <Chip icon={TrendingUp} label={startup.sector} />
-        <Chip icon={Building2}  label={STAGE_LABEL[startup.stage] ?? startup.stage} />
+        <Chip icon={Building2} label={STAGE_LABEL[startup.stage] ?? startup.stage} />
         {location && <Chip icon={MapPin} label={location} />}
       </div>
 
-      {/* Footer */}
       <div className="flex items-center justify-between pt-1 border-t border-stone-100">
-        {/* Profile score */}
         <div className="flex items-center gap-1.5">
           <div className="h-1.5 w-20 rounded-full bg-stone-100 overflow-hidden">
             <div
@@ -289,11 +328,13 @@ function StartupCard({
           <span className="text-[10px] text-stone-400">{startup.profileScore}% complete</span>
         </div>
 
-        {/* Pro-bono offer button */}
-        {isOffered ? (
-          <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            Offer Sent
+        {buttonConfig.showStatus ? (
+          <span
+            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg ${buttonConfig.textColor}`}
+            style={{ backgroundColor: buttonConfig.bgColor }}
+          >
+            <ButtonIcon className="w-3.5 h-3.5" />
+            {buttonConfig.text}
           </span>
         ) : (
           <button

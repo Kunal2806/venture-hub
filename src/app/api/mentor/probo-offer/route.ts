@@ -25,7 +25,6 @@ export async function POST(req: NextRequest) {
     if (!startupProfileId)
       return NextResponse.json({ error: "startupProfileId is required" }, { status: 400 });
 
-    // ── Mentor profile resolve ────────────────────────────────────
     const [mentor] = await db
       .select({
         id:             MentorProfilesTable.id,
@@ -40,7 +39,6 @@ export async function POST(req: NextRequest) {
     if (!mentor || mentor.approvalStatus !== "APPROVED")
       return NextResponse.json({ error: "Mentor profile not found or not approved" }, { status: 404 });
 
-    // ── Startup verify ────────────────────────────────────────────
     const [startup] = await db
       .select({ id: StartupProfilesTable.id, approvalStatus: StartupProfilesTable.approvalStatus })
       .from(StartupProfilesTable)
@@ -50,27 +48,46 @@ export async function POST(req: NextRequest) {
     if (!startup || startup.approvalStatus !== "APPROVED")
       return NextResponse.json({ error: "Startup not found" }, { status: 404 });
 
-    // ── Duplicate check — already offered? ───────────────────────
     const [existing] = await db
-      .select({ id: MentorSessionsTable.id })
+      .select({ id: MentorSessionsTable.id, status: MentorSessionsTable.status })
       .from(MentorSessionsTable)
       .where(
         and(
-          eq(MentorSessionsTable.mentorId,  mentor.id),
+          eq(MentorSessionsTable.mentorId, mentor.id),
           eq(MentorSessionsTable.startupId, startup.id),
           eq(MentorSessionsTable.amountUsd, "0"),
-          eq(MentorSessionsTable.status,    "REQUESTED"),
         )
       )
       .limit(1);
 
-    if (existing)
-      return NextResponse.json(
-        { error: "You have already sent a pro-bono offer to this startup" },
-        { status: 409 }
-      );
+    if (existing) {
+      const blockStatuses = ["REQUESTED", "ACCEPTED", "DECLINED", "COMPLETED"];
+      
+      if (blockStatuses.includes(existing.status)) {
+        if (existing.status === "REQUESTED") {
+          return NextResponse.json(
+            { error: "You have already sent a pro-bono offer to this startup (pending)" },
+            { status: 409 }
+          );
+        } else if (existing.status === "ACCEPTED") {
+          return NextResponse.json(
+            { error: "This startup has already accepted your pro-bono offer" },
+            { status: 409 }
+          );
+        } else if (existing.status === "DECLINED") {
+          return NextResponse.json(
+            { error: "This startup declined your previous pro-bono offer" },
+            { status: 409 }
+          );
+        } else {
+          return NextResponse.json(
+            { error: `Cannot send new offer - existing session is ${existing.status.toLowerCase()}` },
+            { status: 409 }
+          );
+        }
+      }
+    }
 
-    // ── Insert session — mentor initiated, amountUsd = 0 ─────────
     const [newSession] = await db
       .insert(MentorSessionsTable)
       .values({
@@ -80,7 +97,6 @@ export async function POST(req: NextRequest) {
         format:          "VIDEO_CALL",
         amountUsd:       "0",
         durationMinutes: mentor.sessionDurationMinutes ?? 60,
-        // message agendaNote mein store hoga
         agendaNote: message
           ? `Pro-bono Offer\n\n${message}`
           : "Pro-bono Offer",
