@@ -96,7 +96,7 @@ export default function MentorDetailPage() {
 
   return (
     <>
-      <div className="max-w-4xl mx-auto space-y-6 px-1 lg:px-0">
+      <div className="mx-auto space-y-6 px-1 lg:px-0">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-xs lg:text-sm">
           <Link
@@ -148,10 +148,11 @@ export default function MentorDetailPage() {
               <div className="hidden sm:block pb-1">
                 <button
                   onClick={() => setModalOpen(true)}
-                  className="px-6 py-2.5 rounded-xl text-sm font-medium text-white transition-colors hover:opacity-90"
+                  disabled={!mentor.isAvailable}
+                  className="px-6 py-2.5 rounded-xl text-sm font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ backgroundColor: FOREST }}
                 >
-                  Request Session
+                  {mentor.isAvailable ? "Request Session" : "Not Available"}
                 </button>
               </div>
             </div>
@@ -218,6 +219,11 @@ export default function MentorDetailPage() {
                   Open to pro-bono
                 </span>
               )}
+              {!mentor.isAvailable && (
+                <span className="text-xs px-3 py-1 rounded-full font-medium bg-red-50 text-red-700">
+                  Not accepting sessions
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -274,6 +280,43 @@ export default function MentorDetailPage() {
                 </div>
               </div>
             </div>
+            {mentor.reviews && mentor.reviews.length > 0 && (
+              <div className="bg-white rounded-2xl border border-stone-100 p-5 space-y-4">
+                <h2 className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                  Reviews ({mentor.totalReviews})
+                </h2>
+                <div className="space-y-3">
+                  {mentor.reviews.map(r => (
+                    <div key={r.id} className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-medium text-stone-700">{r.raterName}</p>
+                        <div className="flex items-center gap-0.5">
+                          {[1,2,3,4,5].map(i => (
+                            <Star
+                              key={i}
+                              className="w-3 h-3"
+                              style={{
+                                fill:  i <= r.rating ? "#F59E0B" : "transparent",
+                                color: i <= r.rating ? "#F59E0B" : "#D1D5DB",
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      {r.review && (
+                        <p className="text-xs text-stone-500 leading-relaxed">"{r.review}"</p>
+                      )}
+                      <p className="text-[10px] text-stone-300">
+                        {new Date(r.createdAt).toLocaleDateString("en-IN", {
+                          day: "numeric", month: "short", year: "numeric"
+                        })}
+                      </p>
+                      <div className="border-b border-stone-50 last:border-0" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Links */}
             {mentor.linkedinUrl && (
@@ -314,10 +357,11 @@ export default function MentorDetailPage() {
               )}
               <button
                 onClick={() => setModalOpen(true)}
-                className="w-full py-2.5 rounded-xl text-sm font-medium text-white transition-colors hover:opacity-90"
+                disabled={!mentor.isAvailable}
+                className="px-6 py-2.5 rounded-xl text-sm font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ backgroundColor: FOREST }}
               >
-                Request Session
+                {mentor.isAvailable ? "Request Session" : "Not Available"}
               </button>
             </div>
           </div>
@@ -331,10 +375,11 @@ export default function MentorDetailPage() {
       >
         <button
           onClick={() => setModalOpen(true)}
-          className="w-full py-3 rounded-xl text-sm font-medium text-white"
+          disabled={!mentor.isAvailable}
+          className="w-full py-3 rounded-xl text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ backgroundColor: FOREST }}
         >
-          Request a Session
+          {mentor.isAvailable ? "Request a Session" : "Not Available"}
         </button>
       </div>
 

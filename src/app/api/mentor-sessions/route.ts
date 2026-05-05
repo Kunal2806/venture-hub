@@ -6,6 +6,7 @@ import {
   MentorProfilesTable,
   StartupProfilesTable,
   UsersTable,
+  SessionRatingsTable,
 } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { auth } from "@/auth";
@@ -21,7 +22,6 @@ export async function POST(req: NextRequest) {
 
     const userId = session.user.id as string;
 
-    // ── Parse + validate body ─────────────────────────────────────
     const body = await req.json();
     const {
       mentorProfileId, // MentorProfilesTable.id (not userId)
@@ -94,6 +94,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const ratedSessionIds = await db
+    .select({ sessionId: SessionRatingsTable.sessionId })
+    .from(SessionRatingsTable)
+    .where(eq(SessionRatingsTable.raterId, userId));
+
+    const ratedSet = new Set(ratedSessionIds.map(r => r.sessionId));
+
     // ── Determine amount ──────────────────────────────────────────
     const amountUsd = mentor.sessionPriceUsd ?? "0";
 
@@ -111,7 +118,7 @@ export async function POST(req: NextRequest) {
       })
       .returning();
 
-    return NextResponse.json({ data: newSession }, { status: 201 });
+    return NextResponse.json({ data: newSession, ratedSessions: ratedSet }, { status: 201 });
   } catch (error) {
     console.error("[POST /api/mentor-sessions]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -129,9 +136,8 @@ export async function GET(req: NextRequest) {
 
     const userId = session.user.id as string;
     const { searchParams } = req.nextUrl;
-    const status = searchParams.get("status"); // REQUESTED | ACCEPTED | COMPLETED | etc.
+    const status = searchParams.get("status");
 
-    // ── Resolve startup profile ───────────────────────────────────
     const [startupProfile] = await db
       .select({ id: StartupProfilesTable.id })
       .from(StartupProfilesTable)
@@ -142,7 +148,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ data: [] });
     }
 
-    // ── Fetch sessions with mentor name + headline ────────────────
     const conditions = [
       eq(MentorSessionsTable.startupId, startupProfile.id),
     ];
@@ -170,8 +175,8 @@ export async function GET(req: NextRequest) {
         cancelledAt:     MentorSessionsTable.cancelledAt,
         requestedAt:     MentorSessionsTable.requestedAt,
         videoCallLink:   MentorSessionsTable.videoCallLink,
-        // Mentor info
         mentorId:        MentorProfilesTable.id,
+        mentorUserId:    UsersTable.id,        // ✅ Mentor ka userId
         mentorHeadline:  MentorProfilesTable.headline,
         mentorName:      UsersTable.name,
         mentorAvatar:    UsersTable.avatarUrl,
@@ -185,7 +190,19 @@ export async function GET(req: NextRequest) {
       .where(and(...conditions))
       .orderBy(MentorSessionsTable.requestedAt);
 
-    return NextResponse.json({ data: sessions });
+    const ratedSessionIds = await db
+      .select({ sessionId: SessionRatingsTable.sessionId })
+      .from(SessionRatingsTable)
+      .where(eq(SessionRatingsTable.raterId, userId));
+
+    const ratedSet = new Set(ratedSessionIds.map(r => r.sessionId));
+
+    const sessionsWithRating = sessions.map(s => ({
+      ...s,
+      hasRated: ratedSet.has(s.id),
+    }));
+
+    return NextResponse.json({ data: sessionsWithRating });
   } catch (error) {
     console.error("[GET /api/mentor-sessions]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

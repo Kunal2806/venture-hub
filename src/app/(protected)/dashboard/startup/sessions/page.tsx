@@ -8,8 +8,10 @@ import {
   Clock, RotateCcw, CalendarDays, Timer, DollarSign,
   type LucideIcon,
   Heart,
+  Star,
 } from "lucide-react";
 import type { MentorSessionItem, SessionStatus, SessionFormat } from "../mentors/types";
+import { RatingModal } from "@/components/RatingModal";
 
 
 type StatusCfg = { label: string; colorClass: string; bgClass: string; icon: LucideIcon };
@@ -258,6 +260,8 @@ function StartupSessionCard({
   onCancel: (id: string) => void;
 }) {
   const [cancelling, setCancelling] = useState(false);
+  const [ratingModal, setRatingModal] = useState(false);
+  const [alreadyRated, setAlreadyRated] = useState(session.hasRated ?? false);
 
   const sc = STATUS_CFG[session.status];
   const fc = FORMAT_CFG[session.format];
@@ -356,6 +360,26 @@ function StartupSessionCard({
           Join Meeting
         </a>
       )}
+      {session.status === "COMPLETED" && !alreadyRated && (
+        <div className="pt-1 border-t border-stone-100">
+          <button
+            onClick={() => setRatingModal(true)}
+            className="flex items-center gap-1.5 text-xs font-medium px-4 py-2 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
+          >
+            <Star className="w-3.5 h-3.5" />
+            Rate this session
+          </button>
+        </div>
+      )}
+
+      {session.status === "COMPLETED" && alreadyRated && (
+        <div className="pt-1 border-t border-stone-100">
+          <span className="flex items-center gap-1.5 text-xs text-stone-400">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+            You've rated this session
+          </span>
+        </div>
+      )}
 
       {/* Cancel — only REQUESTED sessions */}
       {session.status === "REQUESTED" && (
@@ -369,6 +393,16 @@ function StartupSessionCard({
           </button>
         </div>
       )}
+
+      <RatingModal
+        open={ratingModal}
+        onClose={() => setRatingModal(false)}
+        sessionId={session.id}
+        rateeId={session.mentorUserId} 
+        rateeName={session.mentorName}
+        rateeRole="mentor"
+        onRated={() => setAlreadyRated(true)}
+      />
     </div>
   );
 }

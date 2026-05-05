@@ -7,7 +7,7 @@ import {
   UsersTable,
   PlatformConfigTable
 } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { auth } from "@/auth";
 
 async function resolveMentorProfileId(userId: string): Promise<string | null> {
@@ -70,6 +70,8 @@ export async function GET(req: NextRequest) {
         startupLogo:     UsersTable.avatarUrl,
         mentorEarnings:      MentorSessionsTable.mentorEarnings,
         platformCommission:  MentorSessionsTable.platformCommission,
+        mentorUserId: UsersTable.id,
+        startupUserId:   UsersTable.id, 
       })
       .from(MentorSessionsTable)
       .innerJoin(
@@ -150,6 +152,14 @@ export async function PATCH(req: NextRequest) {
     if (body.status === "COMPLETED") {
       updatePayload.completedAt = now;
       if (body.sessionNotes) updatePayload.sessionNotes = body.sessionNotes;
+
+        await db
+        .update(MentorProfilesTable)
+        .set({
+          totalSessions: sql`${MentorProfilesTable.totalSessions} + 1`,
+          updatedAt: now,
+        })
+        .where(eq(MentorProfilesTable.id, mentorId))
 
       const [config] = await db
         .select({ value: PlatformConfigTable.value })

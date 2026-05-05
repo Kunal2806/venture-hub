@@ -40,6 +40,13 @@ export interface Mentor {
   city: string | null;
   timezone: string | null;
   createdAt: string;
+  reviews?: {
+  id: string;
+  rating: number;
+  review: string | null;
+  createdAt: string;
+  raterName: string;
+}[];
 }
 
 // ── Session request payload (POST /api/mentor-sessions body) ─────────────
@@ -72,6 +79,9 @@ export interface MentorSessionItem {
   startupLogo?: string | null;
   mentorEarnings: string | null;    
   platformCommission: string | null;
+  mentorUserId: string;   
+  startupUserId?: string
+  hasRated?: boolean;
 }
 
 // ── Client-side filter state (FilterPanel) ───────────────────────────────

@@ -1,28 +1,31 @@
-// app/api/mentors/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import {
   MentorProfilesTable,
   MentorAvailabilityTable,
+  SessionRatingsTable,
   UsersTable,
 } from "@/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
+import { auth } from "@/auth";
 import { shapeMentor } from "../route";
 
-// ── GET /api/mentors/:id ──────────────────────────────────────────────────
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
-    // Fetch mentor profile + user in one query
+    if (!UUID_RE.test(id))
+      return NextResponse.json({ error: "Invalid mentor ID" }, { status: 400 });
+
     const [row] = await db
       .select({
         id:                     MentorProfilesTable.id,
         userId:                 MentorProfilesTable.userId,
-        approvalStatus:         MentorProfilesTable.approvalStatus,
         headline:               MentorProfilesTable.headline,
         bio:                    MentorProfilesTable.bio,
         linkedinUrl:            MentorProfilesTable.linkedinUrl,
@@ -42,9 +45,8 @@ export async function GET(
         averageRating:          MentorProfilesTable.averageRating,
         totalRatings:           MentorProfilesTable.totalRatings,
         createdAt:              MentorProfilesTable.createdAt,
-        name:      UsersTable.name,
-        avatarUrl: UsersTable.avatarUrl,
-        email:     UsersTable.email,
+        name:                   UsersTable.name,
+        avatarUrl:              UsersTable.avatarUrl,
       })
       .from(MentorProfilesTable)
       .innerJoin(UsersTable, eq(MentorProfilesTable.userId, UsersTable.id))
@@ -56,46 +58,61 @@ export async function GET(
       )
       .limit(1);
 
-    if (!row) {
+    if (!row)
       return NextResponse.json({ error: "Mentor not found" }, { status: 404 });
-    }
 
-    // ── Compute availabilityHoursPerMonth from MentorAvailabilityTable ──
-    // Each active slot = (endTime - startTime) in hours × 4 weeks/month
-    // startTime / endTime stored as "HH:MM" UTC strings
-    const availabilityRows = await db
-      .select({
-        startTime: MentorAvailabilityTable.startTime,
-        endTime:   MentorAvailabilityTable.endTime,
-      })
-      .from(MentorAvailabilityTable)
-      .where(
-        and(
-          eq(MentorAvailabilityTable.mentorId, id),
-          eq(MentorAvailabilityTable.isActive, true)
-        )
-      );
+    const [slots, reviews] = await Promise.all([
+      db
+        .select({
+          startTime: MentorAvailabilityTable.startTime,
+          endTime:   MentorAvailabilityTable.endTime,
+        })
+        .from(MentorAvailabilityTable)
+        .where(
+          and(
+            eq(MentorAvailabilityTable.mentorId, id),
+            eq(MentorAvailabilityTable.isActive, true)
+          )
+        ),
 
-    const hoursPerWeek = availabilityRows.reduce((acc, slot) => {
+      db
+        .select({
+          id:        SessionRatingsTable.id,
+          rating:    SessionRatingsTable.rating,
+          review:    SessionRatingsTable.review,
+          createdAt: SessionRatingsTable.createdAt,
+          raterName: UsersTable.name,
+        })
+        .from(SessionRatingsTable)
+        .innerJoin(UsersTable, eq(SessionRatingsTable.raterId, UsersTable.id))
+        .where(eq(SessionRatingsTable.rateeId, row.userId))
+        .orderBy(desc(SessionRatingsTable.createdAt))
+        .limit(10),
+    ]);
+
+    const hoursPerWeek = slots.reduce((acc, slot) => {
       const [sh, sm] = slot.startTime.split(":").map(Number);
       const [eh, em] = slot.endTime.split(":").map(Number);
-      const h = eh + em / 60 - (sh + sm / 60);
-      return acc + Math.max(0, h);
+      return acc + Math.max(0, eh + em / 60 - (sh + sm / 60));
     }, 0);
 
-    const availabilityHoursPerMonth = Math.round(hoursPerWeek * 4);
-
-    const mentor = shapeMentor({ ...row, availabilityHoursPerMonth });
-
-    return NextResponse.json({ data: mentor });
+    return NextResponse.json({
+      data: {
+        ...shapeMentor({
+          ...row,
+          availabilityHoursPerMonth: Math.round(hoursPerWeek * 4),
+        }),
+        reviews: reviews.map(r => ({
+          ...r,
+          createdAt: r.createdAt.toISOString(),
+        })),
+      },
+    });
   } catch (error) {
     console.error("[GET /api/mentors/:id]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-
-
-
 
 
 // app/api/mentors/[id]/route.ts

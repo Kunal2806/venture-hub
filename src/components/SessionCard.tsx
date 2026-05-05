@@ -6,8 +6,10 @@ import {
   CheckCircle2, XCircle, Clock, RotateCcw,
   CalendarDays, Timer, DollarSign,
   type LucideIcon,
+  Star,
 } from "lucide-react";
 import type { SessionStatus, SessionFormat } from "@/app/(protected)/dashboard/startup/mentors/types";
+import { RatingModal } from "./RatingModal";
 
 const FOREST = "#1A362B";
 const BEIGE  = "#EFEBE3";
@@ -51,6 +53,8 @@ export interface SessionCardSession {
   requestedAt: string;
   videoCallLink: string | null;
   startupName?: string | null;
+  mentorUserId: string;   
+  startupUserId?: string;
 }
 
 interface SessionCardProps {
@@ -68,6 +72,8 @@ interface SessionCardProps {
 
 export function SessionCard({ session, onStatusChange }: SessionCardProps) {
   const [loading, setLoading] = useState<"accept" | "decline" | "complete" | null>(null);
+  const [ratingModal, setRatingModal] = useState(false); 
+  const [alreadyRated, setAlreadyRated] = useState(false)
 
   const status     = STATUS_CONFIG[session.status];
   const format     = FORMAT_CONFIG[session.format];
@@ -166,7 +172,36 @@ export function SessionCard({ session, onStatusChange }: SessionCardProps) {
           Join Meeting
         </a>
       )}
+      {session.status === "COMPLETED" && !alreadyRated && session.startupUserId && (
+        <div className="pt-1 border-t border-stone-100">
+          <button
+            onClick={() => setRatingModal(true)}
+            className="flex items-center gap-1.5 text-xs font-medium px-4 py-2 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
+          >
+            <Star className="w-3.5 h-3.5" />
+            Rate this startup
+          </button>
+        </div>
+      )}
 
+      {session.status === "COMPLETED" && alreadyRated && (
+        <div className="pt-1 border-t border-stone-100">
+          <span className="flex items-center gap-1.5 text-xs text-stone-400">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+            You've rated this session
+          </span>
+        </div>
+      )}
+
+      <RatingModal
+        open={ratingModal}
+        onClose={() => setRatingModal(false)}
+        sessionId={session.id}
+        rateeId={session.startupUserId!}
+        rateeName={session.startupName ?? "Startup"}
+        rateeRole="startup"
+        onRated={() => setAlreadyRated(true)}
+      />
       {/* Actions */}
       {session.status === "REQUESTED" && (
         <div className="flex gap-2 pt-1 border-t" style={{ borderColor: `${FOREST}08` }}>
