@@ -5,7 +5,8 @@ import {
   MentorProfilesTable,
   StartupProfilesTable,
   UsersTable,
-  PlatformConfigTable
+  PlatformConfigTable,
+  SessionRatingsTable,
 } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { auth } from "@/auth";
@@ -71,7 +72,7 @@ export async function GET(req: NextRequest) {
         mentorEarnings:      MentorSessionsTable.mentorEarnings,
         platformCommission:  MentorSessionsTable.platformCommission,
         mentorUserId: UsersTable.id,
-        startupUserId:   UsersTable.id, 
+        startupUserId:   UsersTable.id,
       })
       .from(MentorSessionsTable)
       .innerJoin(
@@ -82,7 +83,19 @@ export async function GET(req: NextRequest) {
       .where(and(...conditions))
       .orderBy(MentorSessionsTable.requestedAt);
 
-    return NextResponse.json({ data: sessions });
+    const ratedRows = await db
+      .select({ sessionId: SessionRatingsTable.sessionId, rating: SessionRatingsTable.rating })
+      .from(SessionRatingsTable)
+      .where(eq(SessionRatingsTable.raterId, session.user.id as string));
+
+    const ratingsBySession = new Map(ratedRows.map(row => [row.sessionId, row.rating]));
+    const sessionsWithRating = sessions.map(s => ({
+      ...s,
+      hasRated: ratingsBySession.has(s.id),
+      rating:   ratingsBySession.get(s.id) ?? null,
+    }));
+
+    return NextResponse.json({ data: sessionsWithRating });
   } catch (error) {
     console.error("[GET /api/mentor/sessions]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

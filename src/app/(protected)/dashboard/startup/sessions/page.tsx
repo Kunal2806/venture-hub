@@ -262,6 +262,11 @@ function StartupSessionCard({
   const [cancelling, setCancelling] = useState(false);
   const [ratingModal, setRatingModal] = useState(false);
   const [alreadyRated, setAlreadyRated] = useState(session.hasRated ?? false);
+  const [ratingValue, setRatingValue] = useState<number | null>(null);
+
+  useEffect(() => {
+    setAlreadyRated(session.hasRated ?? false);
+  }, [session.hasRated]);
 
   const sc = STATUS_CFG[session.status];
   const fc = FORMAT_CFG[session.format];
@@ -374,10 +379,25 @@ function StartupSessionCard({
 
       {session.status === "COMPLETED" && alreadyRated && (
         <div className="pt-1 border-t border-stone-100">
-          <span className="flex items-center gap-1.5 text-xs text-stone-400">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-            You've rated this session
-          </span>
+          {ratingValue ? (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map(i => (
+                  <Star
+                    key={i}
+                    className="w-3.5 h-3.5"
+                    style={{ color: i <= ratingValue ? "#F59E0B" : "#E5E7EB" }}
+                  />
+                ))}
+              </div>
+              <span className="text-xs text-stone-400">You rated this session</span>
+            </div>
+          ) : (
+            <span className="flex items-center gap-1.5 text-xs text-stone-400">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+              You've rated this session
+            </span>
+          )}
         </div>
       )}
 
@@ -401,7 +421,10 @@ function StartupSessionCard({
         rateeId={session.mentorUserId} 
         rateeName={session.mentorName}
         rateeRole="mentor"
-        onRated={() => setAlreadyRated(true)}
+        onRated={(rating) => {
+          setAlreadyRated(true);
+          setRatingValue(rating);
+        }}
       />
     </div>
   );

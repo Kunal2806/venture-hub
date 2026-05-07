@@ -82,6 +82,7 @@ export interface MentorSessionItem {
   mentorUserId: string;   
   startupUserId?: string
   hasRated?: boolean;
+  rating?: number | null;
 }
 
 // ── Client-side filter state (FilterPanel) ───────────────────────────────

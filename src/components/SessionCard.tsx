@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Video, FileText, MapPin,
   CheckCircle2, XCircle, Clock, RotateCcw,
@@ -54,7 +54,9 @@ export interface SessionCardSession {
   videoCallLink: string | null;
   startupName?: string | null;
   mentorUserId: string;   
-  startupUserId?: string;
+  startupUserId?: string; 
+  hasRated?: boolean;
+  rating?: number | null;
 }
 
 interface SessionCardProps {
@@ -73,7 +75,13 @@ interface SessionCardProps {
 export function SessionCard({ session, onStatusChange }: SessionCardProps) {
   const [loading, setLoading] = useState<"accept" | "decline" | "complete" | null>(null);
   const [ratingModal, setRatingModal] = useState(false); 
-  const [alreadyRated, setAlreadyRated] = useState(false)
+  const [alreadyRated, setAlreadyRated] = useState(session.hasRated ?? false);
+  const [ratingValue, setRatingValue] = useState<number | null>(session.rating ?? null);
+
+  useEffect(() => {
+    setAlreadyRated(session.hasRated ?? false);
+    setRatingValue(session.rating ?? null);
+  }, [session.hasRated, session.rating]);
 
   const status     = STATUS_CONFIG[session.status];
   const format     = FORMAT_CONFIG[session.format];
@@ -186,10 +194,25 @@ export function SessionCard({ session, onStatusChange }: SessionCardProps) {
 
       {session.status === "COMPLETED" && alreadyRated && (
         <div className="pt-1 border-t border-stone-100">
-          <span className="flex items-center gap-1.5 text-xs text-stone-400">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-            You've rated this session
-          </span>
+          {ratingValue ? (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map(i => (
+                  <Star
+                    key={i}
+                    className="w-3.5 h-3.5"
+                    style={{ color: i <= ratingValue ? "#F59E0B" : "#E5E7EB" }}
+                  />
+                ))}
+              </div>
+              <span className="text-xs text-stone-400">You rated this session</span>
+            </div>
+          ) : (
+            <span className="flex items-center gap-1.5 text-xs text-stone-400">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+              You've rated this session
+            </span>
+          )}
         </div>
       )}
 
@@ -200,7 +223,10 @@ export function SessionCard({ session, onStatusChange }: SessionCardProps) {
         rateeId={session.startupUserId!}
         rateeName={session.startupName ?? "Startup"}
         rateeRole="startup"
-        onRated={() => setAlreadyRated(true)}
+        onRated={(rating) => {
+          setAlreadyRated(true);
+          setRatingValue(rating);
+        }}
       />
       {/* Actions */}
       {session.status === "REQUESTED" && (

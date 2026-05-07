@@ -10,7 +10,7 @@ interface RatingModalProps {
   rateeId: string;        
   rateeName: string;      
   rateeRole: "mentor" | "startup";
-  onRated?: () => void;   
+  onRated?: (rating: number) => void;   
 }
 
 export function RatingModal({
@@ -37,7 +37,7 @@ export function RatingModal({
       if (!res.ok) throw new Error(json.error ?? "Failed to submit rating");
       setDone(true);
       setTimeout(() => {
-        onRated?.();
+        onRated?.(rating);
         onClose();
         // reset
         setTimeout(() => { setDone(false); setRating(0); setReview(""); }, 300);
