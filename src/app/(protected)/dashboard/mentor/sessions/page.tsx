@@ -38,16 +38,29 @@ export default function MentorSessionsPage() {
 
   useEffect(() => { fetchSessions(); }, [fetchSessions]);
 
-  function updateSessionStatus(id: string, status: SessionStatus) {
+  function updateSessionStatus(
+    id: string,
+    status: SessionStatus,
+    extra?: { scheduledAt?: string; durationMinutes?: number }
+  ) {
     setSessions(prev =>
-      prev.map(s => s.id === id ? { ...s, status } : s)
+      prev.map(s =>
+        s.id === id
+          ? {
+              ...s,
+              status,
+              scheduledAt: extra?.scheduledAt ?? s.scheduledAt,
+              durationMinutes: extra?.durationMinutes ?? s.durationMinutes,
+            }
+          : s
+      )
     );
   }
 
   async function handleStatusChange(
     id: string,
     status: "ACCEPTED" | "DECLINED" | "COMPLETED",
-    extra?: { scheduledAt?: string; videoCallLink?: string; sessionNotes?: string }
+    extra?: { scheduledAt?: string; durationMinutes?: number; videoCallLink?: string; sessionNotes?: string }
   ) {
     updateSessionStatus(id, status);
     try {

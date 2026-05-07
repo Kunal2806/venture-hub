@@ -46,10 +46,11 @@ export async function POST(req: NextRequest) {
     if (!mentorId)
       return NextResponse.json({ error: "Mentor profile not found" }, { status: 404 });
 
-    const { dayOfWeek, startTime, endTime } = await req.json() as {
+    const { dayOfWeek, startTime, endTime, isProBono } = await req.json() as {
       dayOfWeek: number;
       startTime: string;
       endTime: string;
+      isProBono?: boolean;
     };
 
     const timeRe = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
 
     const [slot] = await db
       .insert(MentorAvailabilityTable)
-      .values({ mentorId, dayOfWeek, startTime, endTime, isActive: true })
+      .values({ mentorId, dayOfWeek, startTime, endTime, isActive: true, isProBono: Boolean(isProBono) })
       .returning();
 
     return NextResponse.json({ data: slot }, { status: 201 });
@@ -82,16 +83,23 @@ export async function PATCH(req: NextRequest) {
     if (!mentorId)
       return NextResponse.json({ error: "Mentor profile not found" }, { status: 404 });
 
-    const { id, isActive } = await req.json() as { id: string; isActive: boolean };
+    const { id, isActive, isProBono } = await req.json() as { id: string; isActive?: boolean; isProBono?: boolean };
 
     if (!id)
       return NextResponse.json({ error: "id is required" }, { status: 400 });
-    if (typeof isActive !== "boolean")
-      return NextResponse.json({ error: "isActive must be boolean" }, { status: 400 });
+    if (typeof isActive !== "boolean" && typeof isProBono !== "boolean")
+      return NextResponse.json(
+        { error: "isActive or isProBono must be provided" },
+        { status: 400 }
+      );
+
+    const updatePayload: Record<string, unknown> = {};
+    if (typeof isActive === "boolean") updatePayload.isActive = isActive;
+    if (typeof isProBono === "boolean") updatePayload.isProBono = isProBono;
 
     const [updated] = await db
       .update(MentorAvailabilityTable)
-      .set({ isActive })
+      .set(updatePayload)
       .where(and(
         eq(MentorAvailabilityTable.id, id),
         eq(MentorAvailabilityTable.mentorId, mentorId)

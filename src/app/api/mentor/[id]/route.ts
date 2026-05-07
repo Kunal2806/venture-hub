@@ -66,6 +66,7 @@ export async function GET(
         .select({
           startTime: MentorAvailabilityTable.startTime,
           endTime:   MentorAvailabilityTable.endTime,
+          isProBono: MentorAvailabilityTable.isProBono,
         })
         .from(MentorAvailabilityTable)
         .where(

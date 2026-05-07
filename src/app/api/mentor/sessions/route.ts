@@ -117,8 +117,9 @@ export async function PATCH(req: NextRequest) {
       status: "ACCEPTED" | "DECLINED" | "COMPLETED" | "RESCHEDULED" | "CANCELLED";
       scheduledAt?: string;    
       videoCallLink?: string;  
-      sessionNotes?: string;   
+      sessionNotes?: string;
       rescheduleReason?: string;
+      durationMinutes?: number;
     };
 
     if (!body.id)
@@ -158,8 +159,9 @@ export async function PATCH(req: NextRequest) {
     };
 
     if (body.status === "ACCEPTED") {
-      if (body.scheduledAt)  updatePayload.scheduledAt  = new Date(body.scheduledAt);
-      if (body.videoCallLink) updatePayload.videoCallLink = body.videoCallLink;
+      if (body.scheduledAt)      updatePayload.scheduledAt      = new Date(body.scheduledAt);
+      if (typeof body.durationMinutes === "number") updatePayload.durationMinutes = body.durationMinutes;
+      if (body.videoCallLink)     updatePayload.videoCallLink     = body.videoCallLink;
     }
 
     if (body.status === "COMPLETED") {
@@ -199,6 +201,7 @@ export async function PATCH(req: NextRequest) {
       updatePayload.rescheduledAt    = now;
       updatePayload.rescheduleReason = body.rescheduleReason ?? null;
       updatePayload.scheduledAt      = body.scheduledAt ? new Date(body.scheduledAt) : null;
+      if (typeof body.durationMinutes === "number") updatePayload.durationMinutes = body.durationMinutes;
     }
 
     if (body.status === "CANCELLED") {

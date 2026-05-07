@@ -648,6 +648,7 @@ export const MentorAvailabilityTable = pgTable(
     startTime: text("start_time").notNull(),     // "09:00" UTC
     endTime: text("end_time").notNull(),         // "17:00" UTC
     isActive: boolean("is_active").default(true).notNull(),
+    isProBono: boolean("is_pro_bono").default(false).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [

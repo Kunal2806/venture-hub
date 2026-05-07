@@ -66,6 +66,7 @@ interface SessionCardProps {
     status: "ACCEPTED" | "DECLINED" | "COMPLETED",
     extra?: {
       scheduledAt?: string;
+      durationMinutes?: number;
       videoCallLink?: string;
       sessionNotes?: string;
     }
@@ -74,7 +75,11 @@ interface SessionCardProps {
 
 export function SessionCard({ session, onStatusChange }: SessionCardProps) {
   const [loading, setLoading] = useState<"accept" | "decline" | "complete" | null>(null);
-  const [ratingModal, setRatingModal] = useState(false); 
+  const [ratingModal, setRatingModal] = useState(false);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [scheduleDateTime, setScheduleDateTime] = useState("");
+  const [scheduleDuration, setScheduleDuration] = useState<number>(session.durationMinutes || 60);
+  const [scheduleError, setScheduleError] = useState("");
   const [alreadyRated, setAlreadyRated] = useState(session.hasRated ?? false);
   const [ratingValue, setRatingValue] = useState<number | null>(session.rating ?? null);
 
@@ -107,11 +112,64 @@ export function SessionCard({ session, onStatusChange }: SessionCardProps) {
     day: "numeric", month: "short",
   });
 
-  async function handle(action: "accept" | "decline" | "complete") {
+  function formatDateTimeLocal(date: Date) {
+    const pad = (value: number) => value.toString().padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  function getDefaultScheduleDateTime() {
+    const next = new Date();
+    next.setMinutes(next.getMinutes() + 30 - (next.getMinutes() % 30), 0, 0);
+    if (next.getHours() >= 18) {
+      next.setDate(next.getDate() + 1);
+      next.setHours(9, 0, 0, 0);
+    }
+    return formatDateTimeLocal(next);
+  }
+
+  function openScheduleModal() {
+    const initialDateTime = session.scheduledAt
+      ? formatDateTimeLocal(new Date(session.scheduledAt))
+      : getDefaultScheduleDateTime();
+
+    setScheduleDateTime(initialDateTime);
+    setScheduleDuration(session.durationMinutes || 60);
+    setScheduleError("");
+    setScheduleModalOpen(true);
+  }
+
+  async function handleScheduleAccept() {
+    setLoading("accept");
+    setScheduleError("");
+
+    if (!scheduleDateTime) {
+      setScheduleError("Select a date and time for this session.");
+      setLoading(null);
+      return;
+    }
+
+    const selected = new Date(scheduleDateTime);
+    if (Number(selected) <= Date.now()) {
+      setScheduleError("Please schedule this session for a future time.");
+      setLoading(null);
+      return;
+    }
+
+    try {
+      await onStatusChange(session.id, "ACCEPTED", {
+        scheduledAt: scheduleDateTime,
+        durationMinutes: scheduleDuration,
+      });
+      setScheduleModalOpen(false);
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function handle(action: "decline" | "complete") {
     setLoading(action);
     try {
       const statusMap = {
-        accept:   "ACCEPTED",
         decline:  "DECLINED",
         complete: "COMPLETED",
       } as const;
@@ -228,14 +286,82 @@ export function SessionCard({ session, onStatusChange }: SessionCardProps) {
           setRatingValue(rating);
         }}
       />
+
+      {scheduleModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Schedule session</h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  Confirm a date, time and duration before accepting this request.
+                </p>
+              </div>
+              <button
+                onClick={() => setScheduleModalOpen(false)}
+                className="text-slate-500 hover:text-slate-900"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-6 grid gap-4">
+              <label className="space-y-2 text-sm text-slate-700">
+                <span>Date and time</span>
+                <input
+                  type="datetime-local"
+                  value={scheduleDateTime}
+                  min={formatDateTimeLocal(new Date())}
+                  onChange={(event) => setScheduleDateTime(event.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                />
+              </label>
+
+              <label className="space-y-2 text-sm text-slate-700">
+                <span>Duration</span>
+                <select
+                  value={scheduleDuration}
+                  onChange={(event) => setScheduleDuration(Number(event.target.value))}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+                >
+                  {[15, 30, 45, 60, 90].map((minutes) => (
+                    <option key={minutes} value={minutes}>{minutes} minutes</option>
+                  ))}
+                </select>
+              </label>
+
+              {scheduleError && (
+                <p className="text-sm text-rose-600">{scheduleError}</p>
+              )}
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <button
+                onClick={handleScheduleAccept}
+                disabled={loading === "accept"}
+                className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading === "accept" ? "Scheduling..." : "Accept & schedule"}
+              </button>
+              <button
+                onClick={() => setScheduleModalOpen(false)}
+                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Actions */}
       {session.status === "REQUESTED" && (
         <div className="flex gap-2 pt-1 border-t" style={{ borderColor: `${FOREST}08` }}>
           <ActionBtn
-            label="Accept"
+            label="Accept & schedule"
             loading={loading === "accept"}
             variant="primary"
-            onClick={() => handle("accept")}
+            onClick={openScheduleModal}
           />
           <ActionBtn
             label="Decline"

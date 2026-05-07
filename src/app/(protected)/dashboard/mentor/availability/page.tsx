@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ChevronRight, Plus, Trash2, Loader2, ToggleLeft, ToggleRight } from "lucide-react";
+import { ChevronRight, Plus, Trash2, Loader2, ToggleLeft, ToggleRight, DollarSign } from "lucide-react";
 
 const FOREST = "#1A362B";
 const CREAM  = "#F9F7F2";
@@ -22,6 +22,7 @@ interface Slot {
   startTime: string;
   endTime: string;
   isActive: boolean;
+  isProBono: boolean;
 }
 
 export default function AvailabilityPage() {
@@ -34,6 +35,7 @@ export default function AvailabilityPage() {
   const [newDay,     setNewDay]     = useState(1);      
   const [newStart,   setNewStart]   = useState("09:00");
   const [newEnd,     setNewEnd]     = useState("17:00");
+  const [newIsProBono, setNewIsProBono] = useState(false);
   const [adding,     setAdding]     = useState(false);
   const [addError,   setAddError]   = useState("");
 
@@ -60,7 +62,7 @@ export default function AvailabilityPage() {
       const res = await fetch("/api/mentor/availability", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dayOfWeek: newDay, startTime: newStart, endTime: newEnd }),
+        body: JSON.stringify({ dayOfWeek: newDay, startTime: newStart, endTime: newEnd, isProBono: newIsProBono }),
       });
       const { data, error: err } = await res.json();
       if (!res.ok) throw new Error(err ?? "Failed to add slot");
@@ -68,6 +70,7 @@ export default function AvailabilityPage() {
         a.dayOfWeek !== b.dayOfWeek ? a.dayOfWeek - b.dayOfWeek : a.startTime.localeCompare(b.startTime)
       ));
       setShowForm(false);
+      setNewIsProBono(false);
     } catch (e) {
       setAddError(e instanceof Error ? e.message : "Something went wrong");
     } finally {
@@ -83,6 +86,24 @@ export default function AvailabilityPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: slot.id, isActive: !slot.isActive }),
+      });
+      const { data, error: err } = await res.json();
+      if (!res.ok) throw new Error(err);
+      setSlots(prev => prev.map(s => s.id === data.id ? data : s));
+    } catch {
+      // silently revert — slot stays as-is
+    } finally {
+      setTogglingId(null);
+    }
+  }
+
+  async function handleToggleMode(slot: Slot) {
+    setTogglingId(slot.id);
+    try {
+      const res = await fetch("/api/mentor/availability", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: slot.id, isProBono: !slot.isProBono }),
       });
       const { data, error: err } = await res.json();
       if (!res.ok) throw new Error(err);
@@ -149,7 +170,7 @@ export default function AvailabilityPage() {
       {showForm && (
         <div className="bg-white rounded-xl border p-5 space-y-4" style={{ borderColor: `${FOREST}12` }}>
           <h2 className="font-serif text-sm font-semibold" style={{ color: FOREST }}>New Availability Slot</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-medium uppercase tracking-wider" style={{ color: `${FOREST}60` }}>Day</label>
               <select
@@ -181,6 +202,18 @@ export default function AvailabilityPage() {
                 style={{ borderColor: `${FOREST}18`, backgroundColor: CREAM, color: "#2D2D2D" }}
               >
                 {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium uppercase tracking-wider" style={{ color: `${FOREST}60` }}>Slot type</label>
+              <select
+                value={newIsProBono ? "PROBONO" : "PAID"}
+                onChange={e => setNewIsProBono(e.target.value === "PROBONO")}
+                className="w-full px-3.5 py-2.5 text-sm rounded-lg border outline-none"
+                style={{ borderColor: `${FOREST}18`, backgroundColor: CREAM, color: "#2D2D2D" }}
+              >
+                <option value="PAID">Paid slot</option>
+                <option value="PROBONO">Pro bono slot</option>
               </select>
             </div>
           </div>
@@ -264,6 +297,15 @@ export default function AvailabilityPage() {
                       >
                         {slot.isActive ? "Active" : "Paused"}
                       </span>
+                      <span
+                        className="text-xs px-2.5 py-1 rounded-full font-medium"
+                        style={{
+                          backgroundColor: slot.isProBono ? "#fef3c7" : "#dbeafe",
+                          color: slot.isProBono ? "#92400e" : "#1d4ed8",
+                        }}
+                      >
+                        {slot.isProBono ? "Pro bono" : "Paid"}
+                      </span>
 
                       {/* Actions */}
                       <div className="flex items-center gap-1 ml-auto">
@@ -280,6 +322,19 @@ export default function AvailabilityPage() {
                             : slot.isActive
                               ? <ToggleRight className="w-5 h-5" />
                               : <ToggleLeft className="w-5 h-5" style={{ color: `${FOREST}40` }} />
+                          }
+                        </button>
+
+                        <button
+                          onClick={() => handleToggleMode(slot)}
+                          disabled={isToggling || isDeleting}
+                          className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
+                          style={{ color: slot.isProBono ? "#b45309" : "#1d4ed8" }}
+                          title={slot.isProBono ? "Set paid" : "Set pro bono"}
+                        >
+                          {isToggling
+                            ? <Loader2 className="w-4 h-4 animate-spin" />
+                            : <DollarSign className="w-5 h-5" />
                           }
                         </button>
 
