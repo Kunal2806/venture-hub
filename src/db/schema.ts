@@ -829,6 +829,11 @@ export const MentorSessionsTable = pgTable(
     }),
     mentorEarnings: decimal("mentor_earnings", { precision: 10, scale: 2 }),
 
+    // Agora video call integration
+    agoraChannel: text("agora_channel"),
+    agoraTokenMentor: text("agora_token_mentor"),
+    agoraTokenStartup: text("agora_token_startup"),
+
     completedAt: timestamp("completed_at", { mode: "date" }),
     cancelledAt: timestamp("cancelled_at", { mode: "date" }),
     cancellationReason: text("cancellation_reason"),

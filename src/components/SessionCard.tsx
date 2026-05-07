@@ -112,6 +112,21 @@ export function SessionCard({ session, onStatusChange }: SessionCardProps) {
     day: "numeric", month: "short",
   });
 
+  async function handleJoinMeeting() {
+    try {
+      const res = await fetch(`/api/sessions/${session.id}/agora`);
+      if (!res.ok) throw new Error("Failed to get meeting credentials");
+
+      const { data } = await res.json();
+      // TODO: Use Agora SDK to join the channel with data.appId, data.channel, data.token, data.uid
+      // For now, just alert the credentials
+      alert(`Agora Credentials:\nApp ID: ${data.appId}\nChannel: ${data.channel}\nToken: ${data.token}\nUID: ${data.uid}`);
+    } catch (error) {
+      console.error("Failed to join meeting:", error);
+      alert("Failed to join meeting. Please try again.");
+    }
+  }
+
   function formatDateTimeLocal(date: Date) {
     const pad = (value: number) => value.toString().padStart(2, "0");
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -225,18 +240,16 @@ export function SessionCard({ session, onStatusChange }: SessionCardProps) {
         )}
       </div>
 
-      {/* ✅ FIXED JOIN LINK */}
-      {session.videoCallLink && session.status === "ACCEPTED" && (
-        <a
-          href={session.videoCallLink}
-          target="_blank"
-          rel="noopener noreferrer"
+      {/* Agora Join Link */}
+      {session.scheduledAt && session.status === "ACCEPTED" && (
+        <button
+          onClick={handleJoinMeeting}
           className="text-xs font-medium flex items-center gap-1.5 w-fit px-3 py-1.5 rounded-lg"
           style={{ backgroundColor: `${FOREST}08`, color: FOREST }}
         >
           <Video className="w-3.5 h-3.5" />
           Join Meeting
-        </a>
+        </button>
       )}
       {session.status === "COMPLETED" && !alreadyRated && session.startupUserId && (
         <div className="pt-1 border-t border-stone-100">
