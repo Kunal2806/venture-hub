@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { MentorSessionItem, SessionStatus, SessionFormat } from "../mentors/types";
 import { RatingModal } from "@/components/RatingModal";
+import AgoraRoom from '@/components/agora/AgoraRoom'
 
 
 type StatusCfg = { label: string; colorClass: string; bgClass: string; icon: LucideIcon };
@@ -48,18 +49,20 @@ export default function StartupSessionsPage() {
   const [loading,  setLoading]  = useState(true);
   const [tab,      setTab]      = useState<SessionStatus | "ALL">("ALL");
 
-  const fetchSessions = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res  = await fetch("/api/mentor-sessions");
-      const json = await res.json();
-      setSessions(json.data ?? []);
-    } catch {
-      setSessions([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+const fetchSessions = useCallback(async () => {
+  setLoading(true);
+  try {
+    const res = await fetch("/api/mentor-sessions");
+    const json = await res.json();
+    console.log("API Response:", json.data); 
+    setSessions(json.data ?? []);
+  } catch (error) {
+    console.error("Fetch error:", error);
+    setSessions([]);
+  } finally {
+    setLoading(false);
+  }
+}, []);
 
   useEffect(() => { fetchSessions(); }, [fetchSessions]);
 
@@ -295,7 +298,13 @@ function StartupSessionCard({
       setCancelling(false);
     }
   }
-
+  console.log("Session Data:", {
+    id: session.id,
+    status: session.status,
+    scheduledAt: session.scheduledAt,
+    agoraChannel: session.agoraChannel,
+    durationMinutes: session.durationMinutes
+  });
   // Mentor avatar initials
   const mentorInitials = session.mentorName
     .split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
@@ -353,18 +362,18 @@ function StartupSessionCard({
         }
       </div>
 
-      {/* Join link — only when accepted */}
-      {session.status === "ACCEPTED" && session.videoCallLink && (
-       <a 
-          href={session.videoCallLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 w-fit text-xs font-medium px-3 py-1.5 rounded-lg bg-stone-100 text-stone-700 hover:bg-stone-200 transition-colors"
-        >
-          <Video className="w-3.5 h-3.5" />
-          Join Meeting
-        </a>
-      )}
+      {/* Join link — only when accepted and scheduled */}
+{session.status === "ACCEPTED" && session.scheduledAt && session.agoraChannel && (
+  
+   <a href={`/agora-room?channel=${session.agoraChannel}&role=startup&sessionId=${session.id}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="text-xs font-medium flex items-center gap-1.5 w-fit px-3 py-1.5 rounded-lg bg-stone-50 text-stone-700 hover:bg-stone-100 transition-colors"
+  >
+    <Video className="w-3.5 h-3.5" />
+    Join Meeting
+  </a>
+)}
       {session.status === "COMPLETED" && !alreadyRated && (
         <div className="pt-1 border-t border-stone-100">
           <button

@@ -65,6 +65,7 @@ export async function GET(req: NextRequest) {
         cancelledAt:     MentorSessionsTable.cancelledAt,
         requestedAt:     MentorSessionsTable.requestedAt,
         videoCallLink:   MentorSessionsTable.videoCallLink,
+        agoraChannel:    MentorSessionsTable.agoraChannel,
         // Startup info — directly joined, no hardcoding needed
         startupId:       StartupProfilesTable.id,
         startupName:     UsersTable.name,
@@ -162,6 +163,10 @@ export async function PATCH(req: NextRequest) {
       if (body.scheduledAt)      updatePayload.scheduledAt      = new Date(body.scheduledAt);
       if (typeof body.durationMinutes === "number") updatePayload.durationMinutes = body.durationMinutes;
       if (body.videoCallLink)     updatePayload.videoCallLink     = body.videoCallLink;
+      
+      // 🔴 YAHAN ADD KAR - Agora channel generate
+      updatePayload.agoraChannel = `mentor_session_${body.id}`;
+      console.log("✅ Generated Agora Channel:", updatePayload.agoraChannel);
     }
 
     if (body.status === "COMPLETED") {
@@ -218,6 +223,9 @@ export async function PATCH(req: NextRequest) {
         )
       )
       .returning();
+
+    // 🔴 YAHAN BHI ADD KAR - Confirm saved
+    console.log("✅ Updated Session with Agora Channel:", updated);
 
     return NextResponse.json({ data: updated });
   } catch (error) {

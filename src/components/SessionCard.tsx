@@ -52,6 +52,7 @@ export interface SessionCardSession {
   amountUsd: string;
   requestedAt: string;
   videoCallLink: string | null;
+  agoraChannel: string | null;
   startupName?: string | null;
   mentorUserId: string;   
   startupUserId?: string; 
@@ -112,20 +113,16 @@ export function SessionCard({ session, onStatusChange }: SessionCardProps) {
     day: "numeric", month: "short",
   });
 
-  async function handleJoinMeeting() {
-    try {
-      const res = await fetch(`/api/sessions/${session.id}/agora`);
-      if (!res.ok) throw new Error("Failed to get meeting credentials");
-
-      const { data } = await res.json();
-      // TODO: Use Agora SDK to join the channel with data.appId, data.channel, data.token, data.uid
-      // For now, just alert the credentials
-      alert(`Agora Credentials:\nApp ID: ${data.appId}\nChannel: ${data.channel}\nToken: ${data.token}\nUID: ${data.uid}`);
-    } catch (error) {
-      console.error("Failed to join meeting:", error);
-      alert("Failed to join meeting. Please try again.");
-    }
+const handleJoinMeeting = () => {
+  if (session.agoraChannel) {
+    window.open(
+      `/agora-room?channel=${session.agoraChannel}&role=mentor&sessionId=${session.id}`,
+      "_blank"
+    );
+  } else {
+    alert("Meeting link not available. Session not accepted yet.");
   }
+};
 
   function formatDateTimeLocal(date: Date) {
     const pad = (value: number) => value.toString().padStart(2, "0");

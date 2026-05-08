@@ -175,6 +175,7 @@ export async function GET(req: NextRequest) {
         cancelledAt:     MentorSessionsTable.cancelledAt,
         requestedAt:     MentorSessionsTable.requestedAt,
         videoCallLink:   MentorSessionsTable.videoCallLink,
+        agoraChannel:    MentorSessionsTable.agoraChannel,
         mentorId:        MentorProfilesTable.id,
         mentorUserId:    UsersTable.id,        // ✅ Mentor ka userId
         mentorHeadline:  MentorProfilesTable.headline,

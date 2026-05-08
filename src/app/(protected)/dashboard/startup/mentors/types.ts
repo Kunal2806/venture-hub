@@ -70,6 +70,7 @@ export interface MentorSessionItem {
   cancelledAt: string | null;
   requestedAt: string;
   videoCallLink: string | null;
+  agoraChannel: string | null;
   mentorId: string;
   mentorHeadline: string | null;
   mentorName: string;
